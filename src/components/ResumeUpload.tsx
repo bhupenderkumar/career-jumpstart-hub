@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { UploadIcon, FileTextIcon, EditIcon, SaveIcon, XIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import * as pdfjsLib from 'pdfjs-dist';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.3.31/build/pdf.worker.mjs';
 
 interface ResumeUploadProps {
   onResumeUpdate: (resumeData: string) => void;
@@ -32,22 +33,85 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onResumeUpdate }) => {
     if (!file) return;
 
     try {
-      const text = await file.text();
-      setUploadedResume(text);
-      localStorage.setItem("userBaseResume", text);
-      onResumeUpdate(text);
-      
-      toast({
-        title: "Resume Uploaded",
-        description: "Your resume has been successfully uploaded and saved.",
-      });
+      if (file.type === 'application/pdf') {
+        const arrayBuffer = await file.arrayBuffer();
+        // Load the PDF document
+        const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+        const pdfDocument = await loadingTask.promise;
+
+        // Get the text content from each page
+        let pdfText = "";
+        for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+          const page = await pdfDocument.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map(item => {
+            if ('str' in item) {
+              return item.str;
+            } else {
+              return '';
+            }
+          }).join(" ");
+          pdfText += pageText + "\n";
+        }
+
+        setUploadedResume(pdfText);
+        localStorage.setItem("userBaseResume", pdfText);
+        onResumeUpdate(pdfText);
+        toast({
+          title: "Resume Uploaded",
+          description: "Your resume has been successfully uploaded and saved.",
+        });
+      } else {
+        const text = await file.text();
+        setUploadedResume(text);
+        localStorage.setItem("userBaseResume", text);
+        onResumeUpdate(text);
+        toast({
+          title: "Resume Uploaded",
+          description: "Your resume has been successfully uploaded and saved.",
+        });
+      }
     } catch (error) {
       console.error("Error reading file:", error);
-      toast({
-        title: "Upload Error",
-        description: "Failed to read the uploaded file. Please try again.",
-        variant: "destructive",
-      });
+      console.log("Attempting to use Hugging Face as a fallback");
+      try {
+        // Use Hugging Face Inference API as a fallback
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch(
+          "https://api-inference.huggingface.co/models/PaddlePaddle/LayoutLMv3",
+          {
+            headers: { Authorization: "Bearer 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" },
+            method: "POST",
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Hugging Face API failed with status ${response.status}`);
+        }
+
+        const result = await response.json();
+        const hfText = result.map((item) => item.words.join(" ")).join("\\n");
+
+        setUploadedResume(hfText);
+        localStorage.setItem("userBaseResume", hfText);
+        onResumeUpdate(hfText);
+        toast({
+          title: "Resume Uploaded (Hugging Face)",
+          description:
+            "Your resume has been successfully uploaded and saved using Hugging Face.",
+        });
+      } catch (hfError) {
+        console.error("Error using Hugging Face API:", hfError);
+        toast({
+          title: "Upload Error",
+          description:
+            "Failed to read the uploaded file using both Gemini and Hugging Face. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -115,7 +179,7 @@ const ResumeUpload: React.FC<ResumeUploadProps> = ({ onResumeUpdate }) => {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".txt,.doc,.docx"
+              accept=".txt,.doc,.docx,.pdf"
               onChange={handleFileUpload}
               className="hidden"
             />

@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { FileTextIcon, DownloadIcon, EditIcon, SaveIcon, XIcon, SparklesIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from 'jspdf';
 
 interface ResumeViewerProps {
   resume: string;
@@ -35,19 +36,47 @@ const ResumeViewer: React.FC<ResumeViewerProps> = ({
       });
       return;
     }
-    
-    // Create a simple text file download for now
-    const element = document.createElement("a");
-    const file = new Blob([resume], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = "ai-generated-resume.txt";
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    
+
+    // Create a new jsPDF instance
+    const pdf = new jsPDF();
+
+    // Set the font size and family
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica');
+
+    // Split the resume text into lines
+    const lines = resume.split('\n');
+
+    // Set the starting Y position
+    let y = 20;
+
+    // Loop through the lines and add them to the PDF
+    for (let i = 0; i < lines.length; i++) {
+      // If the line is too long, split it into multiple lines
+      const textLines = pdf.splitTextToSize(lines[i], 180);
+
+      // Loop through the text lines and add them to the PDF
+      for (let j = 0; j < textLines.length; j++) {
+        // If the Y position is too low, add a new page
+        if (y > 280) {
+          pdf.addPage();
+          y = 20;
+        }
+
+        // Add the text line to the PDF
+        pdf.text(textLines[j], 20, y);
+
+        // Increment the Y position
+        y += 7;
+      }
+    }
+
+    // Save the PDF
+    pdf.save("ai-generated-resume.pdf");
+
     toast({
       title: "Resume Exported",
-      description: "Your resume has been downloaded successfully.",
+      description: "Your resume has been downloaded successfully as a PDF.",
     });
   };
 

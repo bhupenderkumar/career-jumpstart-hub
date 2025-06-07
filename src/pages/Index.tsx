@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,18 +14,23 @@ const Index = () => {
   const [generatedResume, setGeneratedResume] = useState("");
   const [baseResume, setBaseResume] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [applications, setApplications] = useState<any[]>([]);
   const { toast } = useToast();
 
   // Load data from localStorage on component mount
   useEffect(() => {
     const savedJobDetails = localStorage.getItem("jobDetails");
     const savedResume = localStorage.getItem("generatedResume");
-    
+    const savedApplications = localStorage.getItem("applications");
+
     if (savedJobDetails) {
       setJobDetails(savedJobDetails);
     }
     if (savedResume) {
       setGeneratedResume(savedResume);
+    }
+    if (savedApplications) {
+      setApplications(JSON.parse(savedApplications));
     }
   }, []);
 
@@ -59,44 +63,41 @@ const Index = () => {
       
       const isEdit = !!editPrompt;
       const baseInfo = baseResume ? "Based on your uploaded resume" : "AI-generated profile";
-      const editInfo = editPrompt ? `\n\n[UPDATED BASED ON: ${editPrompt}]` : "";
       
       const mockResume = `
-# ${isEdit ? 'Updated Resume' : 'AI-Generated Resume'} - ${new Date().toLocaleDateString()}
+${isEdit ? 'Updated Resume' : 'AI-Generated Resume'} - ${new Date().toLocaleDateString()}
 
-## Personal Information
+Personal Information
 ${baseInfo} - Customized for the specific role and company requirements
 
-## Professional Summary
+Professional Summary
 ${baseResume ? 
   "An experienced professional with the background detailed in your uploaded resume, now optimized" :
   "A qualified professional with skills aligned"
 } to the requirements mentioned in your job description. This resume has been tailored to highlight relevant experience and qualifications.
 
-## Key Skills
-- Skills extracted and emphasized based on job requirements
-- Technical competencies matching the role requirements
-- Soft skills relevant to the position and company culture
-- Industry-specific expertise highlighted from your background
+Key Skills
+Skills extracted and emphasized based on job requirements
+Technical competencies matching the role requirements
+Soft skills relevant to the position and company culture
+Industry-specific expertise highlighted from your background
 
-## Work Experience
+Work Experience
 ${baseResume ?
-  "- Previous roles from your resume highlighted to match job requirements\n- Achievements from your background quantified and made relevant\n- Experience reframed to align with target position keywords" :
-  "- Previous roles highlighted to match job requirements\n- Achievements quantified and relevant to the target position\n- Responsibilities aligned with job description keywords"
+  "Previous roles from your resume highlighted to match job requirements\nAchievements from your background quantified and made relevant\nExperience reframed to align with target position keywords" :
+  "Previous roles highlighted to match job requirements\nAchievements quantified and relevant to the target position\nResponsibilities aligned with job description keywords"
 }
 
-## Education & Certifications
+Education & Certifications
 ${baseResume ?
-  "- Educational background from your resume relevant to the role\n- Certifications from your profile that add value to the application" :
-  "- Educational background relevant to the role\n- Certifications that add value to the application"
+  "Educational background from your resume relevant to the role\nCertifications from your profile that add value to the application" :
+  "Educational background relevant to the role\nCertifications that add value to the application"
 }
 
-## Additional Information
-- Portfolio links and professional profiles optimized for this application
-- Languages and other relevant skills highlighted
-- Volunteer work and projects that demonstrate relevant capabilities
-
-${editInfo}
+Additional Information
+Portfolio links and professional profiles optimized for this application
+Languages and other relevant skills highlighted
+Volunteer work and projects that demonstrate relevant capabilities
 
 ---
 *This resume was generated using AI to match your specific job requirements${baseResume ? ' and your uploaded resume' : ''}.*
@@ -254,10 +255,26 @@ ${editInfo}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <BriefcaseIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No applications yet. Generate your first resume to get started!</p>
-                </div>
+                {applications.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <BriefcaseIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No applications yet. Generate your first resume to get started!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {applications.map((app, index) => (
+                      <Card key={index} className="border">
+                        <CardHeader>
+                          <CardTitle>{app.jobTitle}</CardTitle>
+                          <CardDescription>{app.company} - {app.date}</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <pre className="whitespace-pre-wrap text-sm">{app.resume}</pre>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
