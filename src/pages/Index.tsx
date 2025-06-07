@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BriefcaseIcon, FileTextIcon, MapPinIcon, SparklesIcon } from "lucide-react";
+import { BriefcaseIcon, FileTextIcon, MapPinIcon, SparklesIcon, GlobeIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ResumeUpload from "@/components/ResumeUpload";
 import ResumeViewer from "@/components/ResumeViewer";
 import AIInsights from "@/components/AIInsights";
 import LoadingAnimation from "@/components/LoadingAnimation";
+import JobScraper from "@/components/JobScraper";
 import LanguageSelector from "@/components/LanguageSelector";
 import DocumentGenerator from "@/components/DocumentGenerator";
 import { generateResumeWithAI } from "@/services/geminiAI";
@@ -230,7 +231,7 @@ const Index = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="generate" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="generate" className="flex items-center gap-2">
               <FileTextIcon className="w-4 h-4" />
               Generate Resume
@@ -238,6 +239,10 @@ const Index = () => {
             <TabsTrigger value="applications" className="flex items-center gap-2">
               <BriefcaseIcon className="w-4 h-4" />
               Applications
+            </TabsTrigger>
+            <TabsTrigger value="web3-jobs" className="flex items-center gap-2">
+              <GlobeIcon className="w-4 h-4" />
+              Web3 Jobs
             </TabsTrigger>
             <TabsTrigger value="locations" className="flex items-center gap-2">
               <MapPinIcon className="w-4 h-4" />
@@ -370,6 +375,11 @@ const Index = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Web3 Jobs Tab */}
+          <TabsContent value="web3-jobs" className="mt-6">
+            <JobScraper />
           </TabsContent>
 
           {/* Locations Tab */}
