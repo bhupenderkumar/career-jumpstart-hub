@@ -8,6 +8,11 @@ import { BriefcaseIcon, FileTextIcon, MapPinIcon, SparklesIcon } from "lucide-re
 import { useToast } from "@/hooks/use-toast";
 import ResumeUpload from "@/components/ResumeUpload";
 import ResumeViewer from "@/components/ResumeViewer";
+import AIInsights from "@/components/AIInsights";
+import LoadingAnimation from "@/components/LoadingAnimation";
+import LanguageSelector from "@/components/LanguageSelector";
+import DocumentGenerator from "@/components/DocumentGenerator";
+import { generateResumeWithAI } from "@/services/geminiAI";
 
 const Index = () => {
   const [jobDetails, setJobDetails] = useState("");
@@ -15,6 +20,11 @@ const Index = () => {
   const [baseResume, setBaseResume] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [applications, setApplications] = useState<any[]>([]);
+  const [showApiKeyWarning, setShowApiKeyWarning] = useState(false);
+  const [previousResume, setPreviousResume] = useState("");
+  const [generationStage, setGenerationStage] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState("en");
+  const [selectedCountry, setSelectedCountry] = useState("International");
   const { toast } = useToast();
 
   // Load data from localStorage on component mount
@@ -31,6 +41,12 @@ const Index = () => {
     }
     if (savedApplications) {
       setApplications(JSON.parse(savedApplications));
+    }
+
+    // Check if API key is configured
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+      setShowApiKeyWarning(true);
     }
   }, []);
 
@@ -50,76 +66,71 @@ const Index = () => {
       });
       return;
     }
-    
+
+    // Check if API key is configured
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey || apiKey === 'your_gemini_api_key_here') {
+      toast({
+        title: "API Key Required",
+        description: "Please configure your Google Gemini API key to use AI resume generation.",
+        variant: "destructive",
+      });
+      setShowApiKeyWarning(true);
+      return;
+    }
+
     setIsGenerating(true);
     console.log("Generating resume with Gemini AI for:", jobDetails);
     console.log("Base resume:", baseResume);
     console.log("Edit prompt:", editPrompt);
-    
+
     try {
-      // TODO: This will be connected to Google Gemini API
-      // For now, we'll simulate the API call with enhanced mock data
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      const isEdit = !!editPrompt;
-      const baseInfo = baseResume ? "Based on your uploaded resume" : "AI-generated profile";
-      
-      const mockResume = `
-${isEdit ? 'Updated Resume' : 'AI-Generated Resume'} - ${new Date().toLocaleDateString()}
+      // Store previous resume for comparison
+      if (generatedResume && !editPrompt) {
+        setPreviousResume(generatedResume);
+      }
 
-Personal Information
-${baseInfo} - Customized for the specific role and company requirements
+      // Simulate stages for better UX
+      const stages = ['analyzing', 'processing', 'optimizing', 'generating', 'finalizing'];
 
-Professional Summary
-${baseResume ? 
-  "An experienced professional with the background detailed in your uploaded resume, now optimized" :
-  "A qualified professional with skills aligned"
-} to the requirements mentioned in your job description. This resume has been tailored to highlight relevant experience and qualifications.
+      for (let i = 0; i < stages.length; i++) {
+        setGenerationStage(stages[i]);
+        await new Promise(resolve => setTimeout(resolve, 800)); // Small delay for each stage
+      }
 
-Key Skills
-Skills extracted and emphasized based on job requirements
-Technical competencies matching the role requirements
-Soft skills relevant to the position and company culture
-Industry-specific expertise highlighted from your background
-
-Work Experience
-${baseResume ?
-  "Previous roles from your resume highlighted to match job requirements\nAchievements from your background quantified and made relevant\nExperience reframed to align with target position keywords" :
-  "Previous roles highlighted to match job requirements\nAchievements quantified and relevant to the target position\nResponsibilities aligned with job description keywords"
-}
-
-Education & Certifications
-${baseResume ?
-  "Educational background from your resume relevant to the role\nCertifications from your profile that add value to the application" :
-  "Educational background relevant to the role\nCertifications that add value to the application"
-}
-
-Additional Information
-Portfolio links and professional profiles optimized for this application
-Languages and other relevant skills highlighted
-Volunteer work and projects that demonstrate relevant capabilities
-
----
-*This resume was generated using AI to match your specific job requirements${baseResume ? ' and your uploaded resume' : ''}.*
-      `;
-      
-      setGeneratedResume(mockResume);
-      localStorage.setItem("generatedResume", mockResume);
-      
-      toast({
-        title: isEdit ? "Resume Updated" : "Resume Generated",
-        description: `Your ${isEdit ? 'updated' : 'personalized'} resume has been created successfully!`,
+      const newGeneratedResume = await generateResumeWithAI({
+        jobDescription: jobDetails,
+        baseResume: baseResume || undefined,
+        editPrompt: editPrompt || undefined,
+        language: selectedLanguage,
+        country: selectedCountry
       });
-      
+
+      setGeneratedResume(newGeneratedResume);
+      localStorage.setItem("generatedResume", newGeneratedResume);
+
+      const isEdit = !!editPrompt;
+      toast({
+        title: isEdit ? "Resume Enhanced Successfully" : "Resume Generated Successfully",
+        description: `Your ${isEdit ? 'enhanced' : 'AI-optimized'} resume is ready for ATS systems!`,
+      });
+
     } catch (error) {
       console.error("Error generating resume:", error);
+
+      let errorMessage = "Failed to generate resume. Please try again.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       toast({
         title: "Generation Error",
-        description: "Failed to generate resume. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
       setIsGenerating(false);
+      setGenerationStage("");
     }
   };
 
@@ -147,18 +158,74 @@ Volunteer work and projects that demonstrate relevant capabilities
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-foreground">Career Jumpstart Hub</h1>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                View Applications
-              </Button>
+      <header className="bg-gradient-to-r from-blue-600 via-purple-600 to-green-600 text-white py-16">
+        <div className="container mx-auto px-4 text-center">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-5xl font-bold mb-6">Career Jumpstart Hub</h1>
+            <p className="text-xl mb-4 opacity-90">
+              AI-Powered Resume Generator That Beats ATS Systems
+            </p>
+            <p className="text-lg opacity-80 mb-6">
+              Create professionally optimized resumes that pass through Applicant Tracking Systems
+              and get you shortlisted by top companies
+            </p>
+            <div className="flex justify-center gap-8 text-sm flex-wrap">
+              <div className="flex items-center gap-2">
+                <SparklesIcon className="w-5 h-5" />
+                <span>ATS-Optimized</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <SparklesIcon className="w-5 h-5" />
+                <span>Keyword Integration</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <SparklesIcon className="w-5 h-5" />
+                <span>Professional Formatting</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <SparklesIcon className="w-5 h-5" />
+                <span>Instant PDF Export</span>
+              </div>
             </div>
           </div>
         </div>
       </header>
+
+      {/* API Key Warning */}
+      {showApiKeyWarning && (
+        <div className="container mx-auto px-4 py-4">
+          <Card className="border-orange-200 bg-orange-50">
+            <CardContent className="pt-6">
+              <div className="flex items-start space-x-3">
+                <SparklesIcon className="w-5 h-5 text-orange-600 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-orange-800 mb-2">AI Configuration Required</h3>
+                  <p className="text-orange-700 text-sm mb-3">
+                    To use the AI resume generation feature, you need to configure your Google Gemini API key.
+                  </p>
+                  <div className="space-y-2 text-sm text-orange-700">
+                    <p><strong>Steps to set up:</strong></p>
+                    <ol className="list-decimal list-inside space-y-1 ml-4">
+                      <li>Get your free API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline font-medium">Google AI Studio</a></li>
+                      <li>Create a <code className="bg-orange-100 px-1 rounded">.env</code> file in your project root</li>
+                      <li>Add: <code className="bg-orange-100 px-1 rounded">VITE_GEMINI_API_KEY=your_actual_api_key</code></li>
+                      <li>Restart the development server</li>
+                    </ol>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 border-orange-300 text-orange-700 hover:bg-orange-100"
+                    onClick={() => setShowApiKeyWarning(false)}
+                  >
+                    I'll set this up later
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
@@ -184,63 +251,89 @@ Volunteer work and projects that demonstrate relevant capabilities
               {/* Resume Upload Section */}
               <ResumeUpload onResumeUpdate={handleBaseResumeUpdate} />
               
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Job Input Form */}
-                <Card className="animate-fade-in">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <SparklesIcon className="w-5 h-5" />
-                      AI Resume Generator
-                    </CardTitle>
-                    <CardDescription>
-                      Paste the complete job details below. Our AI will analyze everything and create a tailored resume for you.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="jobDetails">Complete Job Details</Label>
-                      <Textarea
-                        id="jobDetails"
-                        placeholder="Paste everything here - job title, company name, location, job description, requirements, etc. The more details you provide, the better your AI-generated resume will be!"
-                        className="min-h-[300px]"
-                        value={jobDetails}
-                        onChange={(e) => setJobDetails(e.target.value)}
-                      />
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button 
-                        onClick={() => handleGenerateResume()} 
-                        className="flex-1"
-                        disabled={!jobDetails.trim() || isGenerating}
-                      >
-                        <SparklesIcon className="w-4 h-4 mr-2" />
-                        {isGenerating ? "Generating..." : "Generate AI Resume"}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={handleClearData}
-                        disabled={isGenerating}
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                    
-                    {baseResume && (
-                      <div className="text-sm text-muted-foreground p-3 bg-muted/30 rounded-lg">
-                        ✓ Using your uploaded resume as base for personalization
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Resume Viewer */}
-                <ResumeViewer
-                  resume={generatedResume}
-                  onResumeUpdate={handleResumeUpdate}
-                  onRegenerateResume={handleGenerateResume}
-                  isGenerating={isGenerating}
+              <div className="space-y-6">
+                {/* Language Selector */}
+                <LanguageSelector
+                  selectedLanguage={selectedLanguage}
+                  selectedCountry={selectedCountry}
+                  onLanguageChange={(language, country) => {
+                    setSelectedLanguage(language);
+                    setSelectedCountry(country);
+                  }}
                 />
+
+                {/* Loading Animation - Show during generation */}
+                <LoadingAnimation
+                  isVisible={isGenerating}
+                  stage={generationStage}
+                />
+
+                {/* AI Insights - Show when resume is generated */}
+                <AIInsights
+                  jobDescription={jobDetails}
+                  resume={generatedResume}
+                  isVisible={!!generatedResume && !isGenerating}
+                />
+
+                <div className="space-y-6">
+                  {/* Job Input Form */}
+                  <Card className="animate-fade-in">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <SparklesIcon className="w-5 h-5" />
+                        Job Description Input
+                      </CardTitle>
+                      <CardDescription>
+                        Paste the complete job details below. Our AI will generate resume, cover letter, and email template.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="jobDetails">Complete Job Details</Label>
+                        <Textarea
+                          id="jobDetails"
+                          placeholder="Paste everything here - job title, company name, location, job description, requirements, etc. The more details you provide, the better your AI-generated documents will be!"
+                          className="min-h-[200px]"
+                          value={jobDetails}
+                          onChange={(e) => setJobDetails(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={handleClearData}
+                          disabled={isGenerating}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+
+                      {baseResume && (
+                        <div className="text-sm text-green-700 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <SparklesIcon className="w-4 h-4" />
+                            ✓ Using your uploaded resume as base for AI personalization
+                          </div>
+                        </div>
+                      )}
+
+                      {!baseResume && (
+                        <div className="text-sm text-blue-700 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          💡 Upload your existing resume above for better personalization, or generate from scratch using just the job description.
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Document Generator */}
+                  <DocumentGenerator
+                    jobDescription={jobDetails}
+                    baseResume={baseResume}
+                    language={selectedLanguage}
+                    country={selectedCountry}
+                  />
+                </div>
               </div>
             </div>
           </TabsContent>
