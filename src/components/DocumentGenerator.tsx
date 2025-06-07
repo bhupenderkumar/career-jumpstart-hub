@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   FileTextIcon,
   MailIcon,
@@ -10,13 +12,15 @@ import {
   DownloadIcon,
   SparklesIcon,
   CheckCircleIcon,
-  BriefcaseIcon
+  BriefcaseIcon,
+  EditIcon,
+  RefreshCwIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
 import ResumeRenderer from "@/components/ResumeRenderer";
 import PDFPreview from "@/components/PDFPreview";
-import { generateSimplePDF } from "@/utils/simplePDFGenerator";
+import { generateModernPDF } from "@/utils/modernPDFGenerator";
 
 interface DocumentGeneratorProps {
   jobDescription: string;
@@ -34,6 +38,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
   const [documents, setDocuments] = useState<GenerationResult>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState("resume");
+  const [enhancementPrompt, setEnhancementPrompt] = useState("");
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const { toast } = useToast();
 
   const handleGenerateAll = async () => {
@@ -73,6 +79,54 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
   };
 
+  const handleEnhanceDocuments = async () => {
+    if (!enhancementPrompt.trim()) {
+      toast({
+        title: "Missing Enhancement Request",
+        description: "Please provide feedback or enhancement instructions.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!documents.resume) {
+      toast({
+        title: "No Documents",
+        description: "Please generate documents first before enhancing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsEnhancing(true);
+    try {
+      const result = await generateAllDocuments({
+        jobDescription,
+        baseResume: documents.resume, // Use current resume as base
+        editPrompt: enhancementPrompt,
+        language,
+        country,
+        generateType: 'all'
+      });
+
+      setDocuments(result);
+      setEnhancementPrompt(""); // Clear the prompt after successful enhancement
+      toast({
+        title: "Documents Enhanced Successfully",
+        description: "All documents have been updated based on your feedback!",
+      });
+    } catch (error) {
+      console.error('Enhancement error:', error);
+      toast({
+        title: "Enhancement Error",
+        description: "Failed to enhance documents. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
   const handleDownloadPDF = () => {
     if (!documents.resume) {
       toast({
@@ -84,19 +138,52 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      generateSimplePDF({
+      generateModernPDF({
         resume: documents.resume,
         language,
         country
       });
+
       toast({
         title: "Resume Downloaded",
-        description: "Professional PDF resume has been downloaded.",
+        description: "Professional PDF resume has been downloaded successfully!",
       });
     } catch (error) {
+      console.error('PDF generation error:', error);
       toast({
         title: "Download Error",
-        description: "Failed to download PDF. Please try again.",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadCoverLetterPDF = () => {
+    if (!documents.coverLetter) {
+      toast({
+        title: "No Cover Letter",
+        description: "Please generate documents first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      generateModernPDF({
+        resume: documents.coverLetter,
+        language,
+        country
+      });
+
+      toast({
+        title: "Cover Letter Downloaded",
+        description: "Professional PDF cover letter has been downloaded successfully!",
+      });
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast({
+        title: "Download Error",
+        description: "Failed to generate PDF. Please try again.",
         variant: "destructive",
       });
     }
@@ -133,6 +220,45 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {/* Enhancement Section */}
+        {Object.keys(documents).length > 0 && (
+          <Card className="mb-6 border-orange-200 bg-gradient-to-r from-orange-50 to-yellow-50">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <EditIcon className="w-5 h-5 text-orange-600" />
+                <CardTitle className="text-orange-800">Enhance Documents</CardTitle>
+              </div>
+              <CardDescription className="text-orange-700">
+                Provide feedback or specific requests to improve your documents
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="enhancement" className="text-sm font-medium text-orange-800">
+                    Enhancement Instructions
+                  </Label>
+                  <Textarea
+                    id="enhancement"
+                    placeholder="e.g., 'Add more technical details about React projects', 'Make the tone more formal', 'Emphasize leadership experience', 'Add specific metrics and numbers'..."
+                    value={enhancementPrompt}
+                    onChange={(e) => setEnhancementPrompt(e.target.value)}
+                    className="mt-2 border-orange-200 focus:border-orange-400"
+                    rows={3}
+                  />
+                </div>
+                <Button
+                  onClick={handleEnhanceDocuments}
+                  disabled={isEnhancing || !enhancementPrompt.trim()}
+                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                >
+                  <RefreshCwIcon className="w-4 h-4 mr-2" />
+                  {isEnhancing ? "Enhancing..." : "Enhance All Documents"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {Object.keys(documents).length > 0 ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
@@ -145,7 +271,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                 PDF Preview
               </TabsTrigger>
               <TabsTrigger value="cover-letter" className="flex items-center gap-2">
-                <DocumentTextIcon className="w-4 h-4" />
+                <FileIcon className="w-4 h-4" />
                 Cover Letter
               </TabsTrigger>
               <TabsTrigger value="email" className="flex items-center gap-2">
@@ -192,12 +318,21 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Professional Cover Letter</h3>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => copyToClipboard(documents.coverLetter || '', 'Cover Letter')}
                     >
                       Copy Text
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadCoverLetterPDF}
+                      className="border-green-300 text-green-700 hover:bg-green-50"
+                    >
+                      <DownloadIcon className="w-3 h-3 mr-1" />
+                      PDF
                     </Button>
                     <Badge className="bg-blue-100 text-blue-800">
                       <CheckCircleIcon className="w-3 h-3 mr-1" />
@@ -258,7 +393,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                 <p className="text-sm text-gray-600">Professional PDF-ready format</p>
               </div>
               <div className="p-4 border rounded-lg">
-                <DocumentTextIcon className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                <FileIcon className="w-8 h-8 text-green-600 mx-auto mb-2" />
                 <h4 className="font-medium">Tailored Cover Letter</h4>
                 <p className="text-sm text-gray-600">Company-specific content</p>
               </div>

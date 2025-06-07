@@ -1,3 +1,4 @@
+
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize the Gemini AI client
@@ -45,6 +46,7 @@ export const generateResumeWithAI = async ({
 
   return result.resume || '';
 };
+
 
 export const generateAllDocuments = async ({
   jobDescription,
@@ -108,11 +110,12 @@ export const generateAllDocuments = async ({
 
 1. **CONTACT INFORMATION FORMAT:**
    - Name: Use FULL NAME in normal case (not all caps)
-   - Email: Use format "email@domain.com"
-   - Phone: Use format "+country-code-number"
-   - LinkedIn: Use "linkedin.com/in/username"
-   - GitHub: Use "github.com/username"
-   - Each contact item on separate line for icon placement
+   - Email: Use format "email@domain.com" (will be clickable mailto link)
+   - Phone: Use format "+country-code-number" (will be clickable tel link)
+   - LinkedIn: Use format "https://linkedin.com/in/username" (will be clickable link)
+   - GitHub: Use format "https://github.com/username" (will be clickable link)
+   - Website: Use format "https://portfolio-website.com" (will be clickable link)
+   - Each contact item on separate line for icon placement and clickability
 
 2. **SECTION HEADERS:**
    - Use ALL CAPS for section headers: PROFESSIONAL SUMMARY, KEY SKILLS, WORK EXPERIENCE, EDUCATION
@@ -142,7 +145,7 @@ export const generateAllDocuments = async ({
     if (generateType === 'resume' || generateType === 'all') {
       if (editPrompt && baseResume) {
         prompts.resume = `
-You are an expert ATS-optimized resume writer and career consultant. Enhance the existing resume with perfect formatting for PDF generation and HR readability.
+You are an expert ATS-optimized resume writer. Create a FINAL, COMPLETE, READY-TO-SEND resume that will get the candidate shortlisted for THIS SPECIFIC JOB.
 
 CURRENT RESUME:
 ${baseResume}
@@ -150,23 +153,46 @@ ${baseResume}
 ENHANCEMENT REQUEST:
 ${editPrompt}
 
-JOB DESCRIPTION FOR CONTEXT:
+TARGET JOB DESCRIPTION:
 ${jobDescription}
 
 ${formatInstructions}
 
-**SPECIFIC ENHANCEMENT REQUIREMENTS:**
-- Apply the enhancement request while maintaining professional structure
-- Ensure all formatting follows PDF optimization guidelines above
-- Highlight job-relevant technologies and skills
-- Use ATS-friendly language and keywords
-- Quantify achievements where possible
+**CRITICAL REQUIREMENTS FOR JOB MATCHING:**
+- Analyze the job description and ADD realistic fake projects/experience that match the requirements
+- If job mentions "Solana" - add 1-2 Solana blockchain projects with realistic details
+- If job mentions "React" - add React projects with specific features
+- If job mentions "AWS" - add AWS cloud projects with specific services used
+- If job mentions "Python" - add Python automation/data projects
+- KEEP existing company names but MODIFY project descriptions to match job requirements
+- Add realistic metrics and achievements for new projects (e.g., "improved performance by 40%", "reduced costs by $50K")
 
-Return only the enhanced resume content following the exact formatting requirements above.
+**ABSOLUTELY FORBIDDEN:**
+- NO square brackets like [Company Name] or [Add details]
+- NO conditional text like "if known, otherwise omit"
+- NO placeholder text of any kind
+- NO instructions or suggestions to the user
+- NO text like "Platform where job was advertised"
+
+**PROJECT ENHANCEMENT RULES:**
+- Take existing projects and modify them to include job-required technologies
+- Add new realistic projects that directly match job requirements
+- Use specific technical details from the job description
+- Include quantified results and business impact
+- Make every project sound relevant to the target role
+
+**FINAL OUTPUT REQUIREMENTS:**
+- Generate ONLY the complete resume content
+- Start directly with the candidate's name
+- Make it immediately ready to copy-paste and send
+- Ensure every line helps get THIS specific job
+- Include realistic but impressive achievements that match job requirements
+
+IMPORTANT: Create realistic fake experience that matches the job requirements. Do not use any placeholder text or conditional statements.
         `;
       } else if (baseResume) {
         prompts.resume = `
-You are an expert international resume writer specializing in IT professionals. Create a perfectly formatted, ATS-optimized resume for ${country} market.
+You are an expert international resume writer. Create a FINAL, COMPLETE, READY-TO-SEND resume that will get the candidate shortlisted for THIS SPECIFIC JOB.
 
 ORIGINAL RESUME:
 ${baseResume}
@@ -178,19 +204,44 @@ TARGET MARKET: ${country} (${language.toUpperCase()})
 
 ${formatInstructions}
 
-**CRITICAL SUCCESS FACTORS:**
-- Perfect cultural fit for ${country} job market
-- Every line contributes to getting THIS specific job
-- Use exact keywords from job description naturally
-- Highlight relevant technologies prominently
-- Show quantified achievements and impact
-- Format for easy HR scanning and ATS parsing
+**CRITICAL JOB-MATCHING REQUIREMENTS:**
+- Analyze the job description and ADD realistic fake projects/experience that match EXACTLY what they're looking for
+- If job mentions specific technologies (Solana, React, AWS, Python, etc.) - add 1-2 realistic projects using those technologies
+- KEEP existing company names but MODIFY project descriptions to include job-required technologies
+- Add realistic metrics: "improved performance by 35%", "reduced deployment time by 60%", "managed $200K budget"
+- Make existing experience sound more relevant by adding job-required technologies to project descriptions
 
-Return only the perfectly formatted resume content following all formatting requirements above.
+**TECHNOLOGY ENHANCEMENT EXAMPLES:**
+- Job wants "Solana blockchain" → Add: "Developed DeFi protocol on Solana blockchain, handling 10K+ daily transactions"
+- Job wants "React/TypeScript" → Add: "Built responsive React application with TypeScript, serving 50K+ users"
+- Job wants "AWS/Docker" → Add: "Deployed microservices on AWS using Docker containers, reducing costs by 40%"
+- Job wants "Python/ML" → Add: "Implemented Python-based ML pipeline, improving prediction accuracy by 25%"
+
+**ABSOLUTELY FORBIDDEN:**
+- NO square brackets like [Company Name] or [Platform where job was advertised]
+- NO conditional text like "if known, otherwise omit"
+- NO placeholder text of any kind
+- NO instructions or suggestions to the user
+
+**ENHANCEMENT STRATEGY:**
+- Take existing projects and add job-required technologies to them
+- Create 1-2 new realistic projects that directly match job requirements
+- Use specific technical terms from the job description
+- Add quantified business impact for all projects
+- Make every bullet point relevant to the target role
+
+**FINAL OUTPUT:**
+- Generate ONLY the complete resume content
+- Start directly with the candidate's name
+- Make it immediately ready to send to employers
+- Ensure maximum relevance to THIS specific job
+- Include realistic but impressive achievements
+
+IMPORTANT: Add realistic fake experience that matches job requirements. Never use placeholder text or conditional statements.
         `;
       } else {
         prompts.resume = `
-You are an expert resume writer. Create a professional, ATS-optimized resume template based on the job description.
+You are an expert resume writer. Create a FINAL, COMPLETE, PROFESSIONAL resume that will get the candidate shortlisted for THIS SPECIFIC JOB.
 
 TARGET JOB DESCRIPTION:
 ${jobDescription}
@@ -199,14 +250,49 @@ TARGET MARKET: ${country} (${language.toUpperCase()})
 
 ${formatInstructions}
 
-**TEMPLATE REQUIREMENTS:**
-- Create realistic but impressive professional content
-- Use job description keywords naturally
-- Include relevant technical skills and experience
-- Show career progression and achievements
-- Format perfectly for PDF generation and HR review
+**CRITICAL JOB-MATCHING REQUIREMENTS:**
+- Create a realistic professional with 3-5 years experience that PERFECTLY matches the job requirements
+- Analyze job description and include ALL required technologies and skills
+- Create 2-3 realistic projects that directly use the technologies mentioned in the job
+- Add realistic company names and quantified achievements
 
-Return only the professional resume template following all formatting requirements above.
+**TECHNOLOGY MATCHING EXAMPLES:**
+- Job wants "Solana blockchain" → Create: "Developed DeFi lending protocol on Solana, processing $2M+ in transactions"
+- Job wants "React/Node.js" → Create: "Built full-stack e-commerce platform using React and Node.js, serving 25K+ users"
+- Job wants "AWS/Kubernetes" → Create: "Deployed scalable microservices on AWS with Kubernetes, reducing infrastructure costs by 45%"
+- Job wants "Python/Machine Learning" → Create: "Implemented ML recommendation system in Python, improving user engagement by 30%"
+
+**REALISTIC PROFILE CREATION:**
+- Create believable name: "Alex Johnson" or "Sarah Chen"
+- Add realistic contact info with proper formatting:
+  * Email: "alex.johnson@email.com" (clickable mailto)
+  * Phone: "+1-555-123-4567" (clickable tel)
+  * LinkedIn: "https://linkedin.com/in/alexjohnson" (clickable link)
+  * GitHub: "https://github.com/alexjohnson" (clickable link)
+- Create 2-3 previous companies with realistic project descriptions
+- Include education that matches the role requirements
+- Add certifications relevant to the job
+
+**ABSOLUTELY FORBIDDEN:**
+- NO square brackets like [Your Name] or [Company Name]
+- NO conditional text like "if applicable, otherwise omit"
+- NO placeholder text of any kind
+- NO instructions or suggestions to the user
+
+**ACHIEVEMENT EXAMPLES:**
+- "Increased application performance by 60% through code optimization"
+- "Led team of 4 developers to deliver project 2 weeks ahead of schedule"
+- "Reduced deployment time from 2 hours to 15 minutes using CI/CD pipelines"
+- "Improved user retention by 40% through UX enhancements"
+
+**FINAL OUTPUT:**
+- Generate ONLY the complete resume content
+- Start directly with a realistic candidate name
+- Make it immediately ready to send to employers
+- Ensure perfect match with job requirements
+- Include realistic but impressive achievements
+
+IMPORTANT: Create a complete, realistic professional profile that matches the job perfectly. Never use placeholder text.
         `;
       }
     }
@@ -214,51 +300,9 @@ Return only the professional resume template following all formatting requiremen
     // Cover Letter Generation
     if (generateType === 'cover-letter' || generateType === 'all') {
       prompts.coverLetter = `
-You are an expert cover letter writer specializing in IT professionals seeking international opportunities.
+CRITICAL INSTRUCTION: You must create a complete cover letter with ZERO placeholder text. Do NOT include any phrases like "Platform where job was advertised", "REMOVE THIS LINE", "omitted as requested", or any text in square brackets.
 
-JOB DESCRIPTION:
-${jobDescription}
-
-${baseResume ? `CANDIDATE RESUME:\n${baseResume}` : ''}
-
-TARGET MARKET: ${country}
-
-Create a compelling, professional cover letter that:
-
-**STRUCTURE:**
-1. **Header**: Include name and contact information
-2. **Date and Company Address**: Professional business format
-3. **Salutation**: "Dear Hiring Manager" or specific name if available
-4. **Opening Paragraph**: Hook with specific role interest and key qualification
-5. **Body Paragraphs**:
-   - Highlight relevant experience matching job requirements
-   - Show knowledge of company/role
-   - Demonstrate cultural fit for ${country} market
-6. **Closing**: Strong call to action and professional sign-off
-
-**CONTENT REQUIREMENTS:**
-- Match tone and style for ${country} business culture
-- Highlight 2-3 key achievements relevant to the role
-- Show enthusiasm for the specific company and position
-- Demonstrate international experience and adaptability
-- Include specific technologies/skills from job description
-- Keep to one page, professional business format
-
-**FORMATTING:**
-- Use proper business letter format
-- Professional, confident tone
-- Specific examples and quantified achievements
-- Clear paragraph structure
-- Strong opening and closing
-
-Return only the complete cover letter content in professional business format.
-      `;
-    }
-
-    // Email Template Generation
-    if (generateType === 'email' || generateType === 'all') {
-      prompts.email = `
-You are an expert at writing professional job application emails for IT professionals.
+You are an expert cover letter writer. Create a FINAL, COMPLETE, READY-TO-SEND cover letter that will help get the candidate shortlisted.
 
 JOB DESCRIPTION:
 ${jobDescription}
@@ -267,27 +311,163 @@ ${baseResume ? `CANDIDATE BACKGROUND:\n${baseResume}` : ''}
 
 TARGET MARKET: ${country}
 
-Create a professional, concise job application email that:
+**CRITICAL REQUIREMENTS - NO PLACEHOLDER TEXT:**
+- Generate ONLY the final, complete cover letter content
+- NEVER use square brackets like [Company Name] or [Platform where job was advertised]
+- NEVER use conditional text like "if known, otherwise omit this line"
+- NEVER mention "Platform where job was advertised" or similar phrases
+- Use generic professional language that works for any company
+- Make it immediately ready to copy-paste and send to employers
+
+**CONTENT STRUCTURE:**
+1. **Header**: Use realistic contact information from resume or create professional details
+2. **Date**: Use current date format
+3. **Salutation**: Always use "Dear Hiring Manager"
+4. **Opening**: Express interest in "the position" or "this role" (never use placeholders)
+5. **Body**: Highlight relevant experience that matches job requirements
+6. **Closing**: Professional call to action and sign-off
+
+**LANGUAGE RULES:**
+- Instead of "[Company Name]" → use "your organization" or "your company"
+- Instead of "[Position Title]" → use "this position" or "the role"
+- Instead of mentioning where job was found → simply start with "I am writing to express my interest in this opportunity"
+- Instead of "[Previous Company]" → use actual company names from resume or create realistic ones
+
+**ABSOLUTELY FORBIDDEN PHRASES - NEVER USE THESE:**
+- "Platform where job was advertised"
+- "Platform where job was seen"
+- "REMOVE THIS LINE"
+- "omitted as requested"
+- "if known, otherwise omit"
+- Any text in square brackets []
+- Any conditional statements
+- Any reference to where the job was found or advertised
+
+**OPENING SENTENCE RULES:**
+- NEVER mention where you found the job
+- Start directly with: "I am writing to express my keen interest in this opportunity"
+- Or: "I am excited to apply for this position"
+- Or: "I would like to express my interest in joining your team"
+
+**EXAMPLE GOOD OPENING:**
+"Dear Hiring Manager,
+
+I am writing to express my keen interest in this opportunity to join your team. Having reviewed the role requirements, I am confident that my background in [relevant field] aligns perfectly with your needs."
+
+**NEVER WRITE ANYTHING LIKE:**
+- "Platform where job was advertised"
+- "REMOVE THIS LINE"
+- "omitted as requested"
+- Any reference to job boards, websites, or where you found the job
+
+**FINAL OUTPUT:**
+- Generate ONLY the complete cover letter content
+- Start directly with the header/contact information
+- Make it immediately sendable without any edits
+- Use professional, confident tone
+- Include specific achievements that match job requirements
+
+IMPORTANT: Create a complete cover letter with NO placeholder text. Use generic professional language that works universally.
+
+FINAL WARNING: If you include ANY of these phrases, the output will be rejected:
+- "Platform where job was advertised"
+- "REMOVE THIS LINE"
+- "omitted as requested"
+- Any text in square brackets []
+- Any conditional statements
+
+Simply start with "Dear Hiring Manager, I am writing to express my interest in this opportunity..."
+      `;
+    }
+
+    // Email Template Generation
+    if (generateType === 'email' || generateType === 'all') {
+      prompts.email = `
+CRITICAL INSTRUCTION: You must create a complete email with ZERO placeholder text. Do NOT include any phrases like "Platform where job was advertised", "REMOVE THIS LINE", "omitted as requested", or any text in square brackets. Never mention where the job was found.
+
+You are an expert at writing professional job application emails. Create a FINAL, COMPLETE, READY-TO-SEND email that will help get the candidate noticed.
+
+JOB DESCRIPTION:
+${jobDescription}
+
+${baseResume ? `CANDIDATE BACKGROUND:\n${baseResume}` : ''}
+
+TARGET MARKET: ${country}
+
+**CRITICAL REQUIREMENTS - NO PLACEHOLDER TEXT:**
+- Generate ONLY the final, complete email content
+- NEVER use square brackets like [Company Name] or [Position Title]
+- NEVER use conditional text like "if known, otherwise omit"
+- NEVER mention "Platform where job was advertised" or similar phrases
+- Use generic professional language that works for any company
+- Make it immediately ready to copy-paste and send
 
 **EMAIL STRUCTURE:**
-1. **Subject Line**: Clear, specific, professional
-2. **Greeting**: Professional salutation
-3. **Opening**: Brief introduction with specific role interest
-4. **Body**:
-   - 2-3 sentences highlighting key qualifications
-   - Mention of attached resume and cover letter
-   - Show knowledge of company/role
+1. **Subject Line**: Use format like "Application for [Role Type] Position" using actual role from job description
+2. **Greeting**: Always use "Dear Hiring Manager"
+3. **Opening**: Express interest in "this position" or "the role" (never use placeholders)
+4. **Body**: Highlight relevant experience that matches job requirements
 5. **Closing**: Professional sign-off with contact information
+
+**LANGUAGE RULES:**
+- Instead of "[Company Name]" → use "your organization" or "your team"
+- Instead of "[Position Title]" → use "this position" or "the role"
+- Instead of mentioning where job was found → simply start with "I am writing to express my interest in this opportunity"
+- Use actual technologies and skills from job description
+
+**ABSOLUTELY FORBIDDEN PHRASES - NEVER USE THESE:**
+- "Platform where job was advertised"
+- "Platform where job was seen"
+- "REMOVE THIS LINE"
+- "omitted as requested"
+- "if known, otherwise omit"
+- Any text in square brackets []
+- Any conditional statements
+- Any reference to where the job was found or advertised
+
+**EMAIL OPENING RULES:**
+- NEVER mention where you found the job
+- Start subject with: "Application for [Role] Position" using actual role from job description
+- Start email body with: "Dear Hiring Manager, I am writing to express my interest in this opportunity"
+- Or: "Dear Hiring Manager, I am excited to apply for this position"
+
+**EXAMPLE GOOD EMAIL OPENING:**
+"Subject: Application for Software Developer Position
+
+Dear Hiring Manager,
+
+I am writing to express my interest in this opportunity to join your development team. With my background in software development and passion for innovative solutions, I believe I would be a valuable addition to your organization."
+
+**NEVER WRITE ANYTHING LIKE:**
+- "Platform where job was advertised"
+- "REMOVE THIS LINE"
+- "omitted as requested"
+- Any reference to job boards, websites, or where you found the job
 
 **CONTENT REQUIREMENTS:**
 - Keep email body to 3-4 short paragraphs maximum
-- Professional but personable tone appropriate for ${country}
-- Highlight 1-2 key achievements relevant to the role
+- Highlight 1-2 key achievements that match job requirements
 - Show enthusiasm without being overly casual
-- Include clear call to action
 - Mention attachments (resume and cover letter)
+- Include clear call to action
 
-Return the complete email including subject line, body, and signature in professional email format.
+**FINAL OUTPUT:**
+- Generate ONLY the complete email content
+- Start directly with the subject line
+- Make it immediately sendable without any edits
+- Use professional, confident tone
+- Include specific qualifications that match job requirements
+
+IMPORTANT: Create a complete email with NO placeholder text. Use generic professional language that works universally.
+
+FINAL WARNING: If you include ANY of these phrases, the output will be rejected:
+- "Platform where job was advertised"
+- "REMOVE THIS LINE"
+- "omitted as requested"
+- Any text in square brackets []
+- Any conditional statements
+
+Simply start with "Subject: Application for [Role] Position" and "Dear Hiring Manager, I am writing to express my interest in this opportunity..."
       `;
     }
 
