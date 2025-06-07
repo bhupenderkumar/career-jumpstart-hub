@@ -9,6 +9,24 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      '/api/jobs': {
+        target: 'https://remoteok.io',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/jobs/, '/api'),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; JobScraper/1.0)',
+        }
+      },
+      '/api/web3career': {
+        target: 'https://web3.career',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/web3career/, ''),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; JobScraper/1.0)',
+        }
+      }
+    }
   },
   plugins: [
     react(),

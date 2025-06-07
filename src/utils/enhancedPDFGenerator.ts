@@ -4,6 +4,7 @@ interface PDFGeneratorOptions {
   resume: string;
   language: string;
   country: string;
+  type?: 'resume' | 'cover-letter' | 'email';
 }
 
 // Extract name and role from resume for filename
@@ -43,21 +44,22 @@ const extractNameAndRole = (resume: string): { name: string; role: string } => {
   return { name: name || 'resume', role };
 };
 
-export const generateEnhancedPDF = ({ resume, language, country }: PDFGeneratorOptions) => {
+export const generateEnhancedPDF = ({ resume, language, country, type = 'resume' }: PDFGeneratorOptions) => {
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;
-  const margin = 12;
+  const margin = 15; // Increased margin for better readability
   const maxWidth = pageWidth - (margin * 2);
   let y = margin;
 
-  // Enhanced color scheme
+  // Simple, professional color scheme
   const colors = {
-    primary: [41, 98, 255],      // Professional blue
-    secondary: [55, 65, 81],     // Dark gray
-    accent: [16, 185, 129],      // Green
-    light: [156, 163, 175],      // Light gray
-    background: [249, 250, 251]  // Very light gray
+    primary: [41, 71, 135],      // Navy blue
+    secondary: [60, 60, 60],     // Dark gray
+    accent: [70, 150, 145],      // Teal
+    light: [100, 100, 100],      // Medium gray
+    background: [240, 240, 240], // Light gray
+    highlight: [245, 250, 255]   // Very light blue
   };
 
   // Enhanced text cleaning
@@ -72,6 +74,9 @@ export const generateEnhancedPDF = ({ resume, language, country }: PDFGeneratorO
       .replace(/_(.*?)_/g, '$1')
       .replace(/`(.*?)`/g, '$1')
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      // Normalize bullet points and dashes
+      .replace(/[•●◦○⚬]/g, '•')
+      .replace(/[-–—]/g, '-')
       .trim();
   };
 
@@ -85,7 +90,7 @@ export const generateEnhancedPDF = ({ resume, language, country }: PDFGeneratorO
     return '📍';
   };
 
-  // Enhanced text helper with better spacing
+  // Enhanced text helper with better spacing and page breaks
   const addText = (text: string, x: number, yPos: number, options: any = {}): number => {
     const {
       fontSize = 9,
@@ -114,14 +119,20 @@ export const generateEnhancedPDF = ({ resume, language, country }: PDFGeneratorO
 
     const lines = pdf.splitTextToSize(cleanedText, textMaxWidth);
     const lineSpacing = fontSize * lineHeight * 0.35;
+    let currentY = yPos;
 
     lines.forEach((line: string, index: number) => {
-      if (yPos + (index * lineSpacing) < pageHeight - 15) {
-        pdf.text(line, finalX, yPos + (index * lineSpacing));
+      // Check if we need a new page for this line
+      if (currentY > pageHeight - 20) {
+        pdf.addPage();
+        currentY = margin;
       }
+
+      pdf.text(line, finalX, currentY);
+      currentY += lineSpacing;
     });
 
-    return yPos + (lines.length * lineSpacing);
+    return currentY;
   };
 
   // Enhanced line helper
@@ -137,91 +148,135 @@ export const generateEnhancedPDF = ({ resume, language, country }: PDFGeneratorO
     pdf.rect(x, y, width, height, 'F');
   };
 
-  // Enhanced section with better formatting
+  // Enhanced section with better formatting and proper page breaks
   const addSection = (title: string, content: string[], yPos: number): number => {
-    if (yPos > pageHeight - 30) return yPos; // Prevent overflow
+    // Check if we need a new page for the section header
+    if (yPos > pageHeight - 40) {
+      pdf.addPage();
+      yPos = margin;
+    }
 
     console.log(`Adding section: ${title} with ${content.length} items at y=${yPos}`);
 
     // Section spacing
-    yPos += 6;
+    yPos += 8;
 
-    // Section header with background
-    const headerHeight = 8;
-    addBackground(margin - 2, yPos - 2, maxWidth + 4, headerHeight, colors.background);
+    // Simple but effective section header
+    // Adjust section styling based on document type
+    const headerHeight = type === 'cover-letter' ? 14 : type === 'email' ? 10 : 12;
+    const headerBg = type === 'email' ? colors.background : colors.highlight;
+    addBackground(0, yPos - 4, pageWidth, headerHeight, headerBg);
 
-    // Section title
-    yPos = addText(title.toUpperCase(), margin, yPos + 3, {
-      fontSize: 11,
+    // Adjust section title styling
+    const titleStyle = type === 'cover-letter' ? {
+      fontSize: 13,
       fontStyle: 'bold',
       color: colors.primary
-    });
+    } : type === 'email' ? {
+      fontSize: 11,
+      fontStyle: 'bold',
+      color: colors.secondary
+    } : {
+      fontSize: 12,
+      fontStyle: 'bold',
+      color: colors.primary
+    };
 
-    // Underline
-    addLine(margin, yPos + 1, margin + 40, yPos + 1, colors.accent, 1);
-    yPos += 4;
+    yPos = addText(title.toUpperCase(), margin, yPos + 4, titleStyle);
 
-    // Content with better formatting
+    // Subtle accent line
+    addLine(margin, yPos + 3, pageWidth - margin, yPos + 3, colors.accent, 0.5);
+    yPos += 8; // Increased spacing after section title
+
+    // Content with better formatting and proper page breaks
     content.forEach(item => {
-      if (yPos > pageHeight - 15) return; // Prevent overflow
-
       const cleanItem = cleanText(item);
       if (!cleanItem) return;
 
+      // Check if we need a new page before adding content
+      if (yPos > pageHeight - 25) {
+        pdf.addPage();
+        yPos = margin;
+      }
+
       if (cleanItem.startsWith('•') || cleanItem.startsWith('-') || cleanItem.startsWith('*')) {
-        // Bullet points with better spacing
+        // Enhanced bullet points with filled circles
         const bulletText = cleanItem.replace(/^[•\-\*]\s*/, '');
 
-        // Add bullet
-        yPos = addText('•', margin + 3, yPos, {
-          fontSize: 8,
-          color: colors.accent,
-          fontStyle: 'bold'
-        });
+        // Draw a filled circle bullet point
+        pdf.setFillColor(colors.accent[0], colors.accent[1], colors.accent[2]);
+        pdf.circle(margin + 4, yPos - 1.75, 0.8, 'F');
 
-        // Add bullet text
-        const bulletY = yPos - 3; // Align with bullet
-        yPos = addText(bulletText, margin + 10, bulletY, {
-          fontSize: 9,
+        // Add bullet text with perfect alignment
+        const bulletTextY = yPos - 0.5; // Slight adjustment for perfect alignment
+        yPos = addText(bulletText, margin + 8, bulletTextY, {
+          fontSize: 10,
+          fontStyle: 'normal',
           color: colors.secondary,
           maxWidth: maxWidth - 15,
           lineHeight: 1.3
         });
-        yPos += 1; // Small spacing between bullets
+
+        // Add minimal space between bullet points
+        yPos += 1.5;
 
       } else if (cleanItem.includes('|')) {
-        // Job title with company - enhanced formatting
+        // Job title with company - enhanced formatting with bolder text
         const parts = cleanItem.split('|').map(p => p.trim());
 
-        // Job title (bold)
-        yPos = addText(parts[0], margin, yPos, {
-          fontSize: 10,
+        // Job title with highlight background
+        const titleText = parts[0];
+        const titleWidth = pdf.getTextWidth(titleText);
+        
+        // Add highlight background
+        // Highlight important job titles
+        addBackground(margin - 2, yPos - 6, titleWidth + 4, 8, colors.highlight);
+        
+        // Add job title with better contrast
+        yPos = addText(titleText, margin, yPos, {
+          fontSize: 11.5,
           fontStyle: 'bold',
-          color: colors.secondary
+          color: colors.primary
         });
 
-        // Company and dates (normal, blue)
+        // Company and dates (semi-bold, blue)
         if (parts[1]) {
-          const companyY = yPos - 3; // Same line as title
-          addText(`| ${parts[1]}`, margin + pdf.getTextWidth(parts[0]) + 3, companyY, {
-            fontSize: 9,
+          const companyY = yPos - 4; // Same line as title
+          addText(`| ${parts[1]}`, margin + pdf.getTextWidth(parts[0]) + 5, companyY, {
+            fontSize: 10,
+            fontStyle: 'bold',
             color: colors.primary
           });
         }
-        yPos += 2;
+        yPos += 3;
 
       } else {
-        // Regular text with better spacing
-        yPos = addText(cleanItem, margin, yPos, {
-          fontSize: 9,
+        // Adjust text style based on document type
+        const textStyle = type === 'cover-letter' ? {
+          fontSize: 11,
+          fontStyle: 'normal',
           color: colors.secondary,
-          lineHeight: 1.3
-        });
-        yPos += 1;
+          lineHeight: 1.6,
+          maxWidth: maxWidth - 10
+        } : type === 'email' ? {
+          fontSize: 10.5,
+          fontStyle: 'normal',
+          color: colors.secondary,
+          lineHeight: 1.5,
+          maxWidth: maxWidth - 8
+        } : {
+          fontSize: 10,
+          fontStyle: 'normal',
+          color: colors.secondary,
+          lineHeight: 1.4
+        };
+
+        yPos = addText(cleanItem, margin, yPos, textStyle);
+        yPos += type === 'cover-letter' ? 4 : type === 'email' ? 3 : 2;
       }
     });
 
-    return yPos + 3; // Section spacing
+    return yPos + 5; // Increased section spacing
   };
 
   // Enhanced resume parsing
@@ -274,17 +329,37 @@ export const generateEnhancedPDF = ({ resume, language, country }: PDFGeneratorO
   try {
     const { sections, headerInfo } = parseResume(resume);
 
-    // Professional header with enhanced design
+    // Different header styling based on document type
     if (headerInfo.length > 0) {
-      // Header background
-      addBackground(0, 0, pageWidth, 35, colors.background);
+      if (type === 'cover-letter') {
+        // Header background with larger height for cover letter
+        addBackground(0, 0, pageWidth, 45, colors.highlight);
+        addBackground(0, 40, pageWidth, 5, colors.background);
+        
+        const date = new Date().toLocaleDateString();
+        y = addText(date, pageWidth - margin - 40, y + 8, {
+          fontSize: 10,
+          color: colors.secondary,
+          align: 'right'
+        });
+        y += 4;
+      } else if (type === 'email') {
+        // Minimal header for email template
+        addBackground(0, 0, pageWidth, 30, colors.highlight);
+        y += 4;
+      } else {
+        // Default resume header
+        addBackground(0, 0, pageWidth, 40, colors.highlight);
+        addBackground(0, 35, pageWidth, 5, colors.background);
+      }
 
       // Name (large, bold, primary color)
       const name = cleanText(headerInfo[0]);
       y = addText(name, margin, y + 8, {
-        fontSize: 20,
+        fontSize: type === 'cover-letter' ? 18 : type === 'email' ? 16 : 20,
         fontStyle: 'bold',
-        color: colors.primary
+        color: colors.primary,
+        align: type === 'cover-letter' ? 'right' : 'left'
       });
       y += 2;
 
@@ -337,13 +412,24 @@ export const generateEnhancedPDF = ({ resume, language, country }: PDFGeneratorO
         y = contactY + 6;
       }
 
-      // Professional separator line
-      addLine(margin, y, pageWidth - margin, y, colors.accent, 1.5);
-      y += 6;
+      // Professional separator line - positioned better
+      addLine(margin, y + 2, pageWidth - margin, y + 2, colors.accent, 1);
+      y += 8;
     }
 
-    // Add sections in order - try multiple variations
-    const sectionMappings = [
+    // Define sections based on document type
+    const sectionMappings = type === 'cover-letter' ? [
+      { keys: ['letterheader', 'header'], title: 'Letter Header' },
+      { keys: ['greeting', 'salutation'], title: 'Greeting' },
+      { keys: ['opening', 'introduction'], title: 'Opening' },
+      { keys: ['body', 'content', 'main'], title: 'Letter Body' },
+      { keys: ['closing', 'conclusion'], title: 'Closing' },
+    ] : type === 'email' ? [
+      { keys: ['subject', 'emailsubject'], title: 'Subject Line' },
+      { keys: ['greeting', 'salutation'], title: 'Greeting' },
+      { keys: ['body', 'content', 'main'], title: 'Email Body' },
+      { keys: ['closing', 'signature'], title: 'Signature' },
+    ] : [
       { keys: ['professionalsummary', 'summary', 'profile'], title: 'Professional Summary' },
       { keys: ['keyskills', 'skills', 'technicalskills'], title: 'Key Skills' },
       { keys: ['workexperience', 'experience', 'employment', 'career'], title: 'Work Experience' },
@@ -356,7 +442,7 @@ export const generateEnhancedPDF = ({ resume, language, country }: PDFGeneratorO
       // Find the first matching section key
       const foundKey = mapping.keys.find(key => sections[key] && sections[key].length > 0);
 
-      if (foundKey && y < pageHeight - 30) {
+      if (foundKey) {
         console.log(`Rendering section: ${mapping.title} (found as: ${foundKey})`);
         y = addSection(mapping.title, sections[foundKey], y);
       }
@@ -368,7 +454,7 @@ export const generateEnhancedPDF = ({ resume, language, country }: PDFGeneratorO
         mapping.keys.includes(sectionKey)
       );
 
-      if (!isAlreadyRendered && content.length > 0 && y < pageHeight - 30) {
+      if (!isAlreadyRendered && content.length > 0) {
         const title = sectionKey
           .replace(/([a-z])([A-Z])/g, '$1 $2')
           .replace(/^./, str => str.toUpperCase());
@@ -377,24 +463,23 @@ export const generateEnhancedPDF = ({ resume, language, country }: PDFGeneratorO
       }
     });
 
-    // Professional footer
-    const footerY = pageHeight - 8;
-    addText(`AI-Optimized for ${country} | Generated ${new Date().toLocaleDateString()}`, pageWidth / 2, footerY, {
-      fontSize: 7,
-      color: colors.light,
-      align: 'center'
-    });
+    // Remove footer - clean professional look
 
-    // Smart file naming based on content
+    // Smart file naming based on content and type
     const { name, role } = extractNameAndRole(resume);
     const countryCode = country.toLowerCase().replace(/[^a-z]/g, '').replace('international', '');
-    const fileName = countryCode ? `${name}_${role}_${countryCode}_resume.pdf` : `${name}_${role}_resume.pdf`;
+    const typeLabel = type === 'cover-letter' ? 'cover_letter' :
+                     type === 'email' ? 'email' : 'resume';
+    
+    const fileName = countryCode ?
+      `${name}_${role}_${countryCode}_${typeLabel}.pdf` :
+      `${name}_${role}_${typeLabel}.pdf`;
 
     pdf.save(fileName);
-    return true;
-
   } catch (error) {
     console.error('Enhanced PDF generation error:', error);
     throw new Error('Failed to generate enhanced PDF');
+    return false;
   }
+  return true;
 };

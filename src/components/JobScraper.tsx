@@ -13,10 +13,10 @@ import {
   MapPinIcon,
   DollarSignIcon,
   ClockIcon,
-  BuildingIcon
+  BuildingIcon,
+  LinkedinIcon
 } from "lucide-react";
-import { Job, JobScrapingResult } from "@/types/job";
-import { scrapeWeb3Jobs, fetchJobDescription } from "@/utils/jobScraper";
+import { Job, JobScrapingResult, scrapeWeb3Jobs, fetchJobDescription } from "@/utils/jobScraper";
 
 const JobScraper = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -104,8 +104,36 @@ Apply at: ${job.applyUrl}
     }
   };
 
-  const openApplyPage = (url: string) => {
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const openApplyPage = (url: string, jobTitle: string, company: string) => {
+    try {
+      // Try to open the direct URL first
+      const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+
+      // If popup was blocked or failed, provide alternative
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        // Fallback: show toast with manual instructions
+        toast({
+          title: "Apply to " + company,
+          description: `Please visit ${company}'s career page manually: ${url}`,
+          duration: 8000,
+        });
+      }
+    } catch (error) {
+      console.error('Error opening apply page:', error);
+
+      // Fallback: provide search instructions
+      toast({
+        title: "Apply Manually",
+        description: `Search for "${jobTitle}" at ${company} on LinkedIn, Indeed, or the company's career page.`,
+        duration: 8000,
+      });
+    }
+  };
+
+  const searchOnLinkedIn = (jobTitle: string, company: string) => {
+    const searchQuery = encodeURIComponent(`${jobTitle} ${company}`);
+    const linkedInUrl = `https://www.linkedin.com/jobs/search/?keywords=${searchQuery}`;
+    window.open(linkedInUrl, '_blank', 'noopener,noreferrer');
   };
 
   const filteredJobs = jobs.filter(job =>
@@ -134,8 +162,12 @@ Apply at: ${job.applyUrl}
           </Button>
         </div>
         <CardDescription>
-          Browse and apply to {totalCount.toLocaleString()} Java jobs in Web3 • Page {currentPage}
+          Browse and apply to {totalCount.toLocaleString()} Java jobs posted in the last 24 hours • Page {currentPage}
         </CardDescription>
+        <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-sm text-green-700 dark:text-green-300">
+          🕒 <strong>Fresh Java Jobs:</strong> Showing only jobs posted in the last 24 hours from real companies.
+          Click "Apply Now" to visit the company's official career page or use "Search on LinkedIn" for more options.
+        </div>
       </CardHeader>
       <CardContent>
         {/* Search Bar */}
@@ -208,24 +240,35 @@ Apply at: ${job.applyUrl}
                   </div>
                   
                   {/* Action Buttons */}
-                  <div className="flex gap-3">
+                  <div className="space-y-2">
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => copyJobDescription(job)}
+                        disabled={loadingDescriptions.has(job.id)}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                      >
+                        <CopyIcon className="w-4 h-4 mr-2" />
+                        {loadingDescriptions.has(job.id) ? 'Copying...' : 'Copy Description'}
+                      </Button>
+                      <Button
+                        onClick={() => openApplyPage(job.applyUrl, job.title, job.company)}
+                        size="sm"
+                        className="flex-1 bg-blue-600 hover:bg-blue-700"
+                      >
+                        <ExternalLinkIcon className="w-4 h-4 mr-2" />
+                        Apply Now
+                      </Button>
+                    </div>
                     <Button
-                      onClick={() => copyJobDescription(job)}
-                      disabled={loadingDescriptions.has(job.id)}
+                      onClick={() => searchOnLinkedIn(job.title, job.company)}
                       variant="outline"
                       size="sm"
-                      className="flex-1"
+                      className="w-full text-blue-600 border-blue-200 hover:bg-blue-50"
                     >
-                      <CopyIcon className="w-4 h-4 mr-2" />
-                      {loadingDescriptions.has(job.id) ? 'Copying...' : 'Copy Description'}
-                    </Button>
-                    <Button
-                      onClick={() => openApplyPage(job.applyUrl)}
-                      size="sm"
-                      className="flex-1 bg-blue-600 hover:bg-blue-700"
-                    >
-                      <ExternalLinkIcon className="w-4 h-4 mr-2" />
-                      Apply Now
+                      <LinkedinIcon className="w-4 h-4 mr-2" />
+                      Search on LinkedIn
                     </Button>
                   </div>
                 </CardContent>

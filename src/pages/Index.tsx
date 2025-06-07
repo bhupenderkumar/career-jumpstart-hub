@@ -4,15 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BriefcaseIcon, FileTextIcon, MapPinIcon, SparklesIcon, GlobeIcon } from "lucide-react";
+import { BriefcaseIcon, FileTextIcon, MapPinIcon, SparklesIcon, GlobeIcon, UserIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ResumeUpload from "@/components/ResumeUpload";
 import ResumeViewer from "@/components/ResumeViewer";
 import AIInsights from "@/components/AIInsights";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import JobScraper from "@/components/JobScraper";
+import JSearchTest from "@/components/JSearchTest";
+import EnhancedJobScraper from "@/components/EnhancedJobScraper";
+import ContactInfoTest from "@/components/ContactInfoTest";
 import LanguageSelector from "@/components/LanguageSelector";
 import DocumentGenerator from "@/components/DocumentGenerator";
+import ApplicationManager from "@/components/ApplicationManager";
 import { generateResumeWithAI } from "@/services/geminiAI";
 
 const Index = () => {
@@ -231,7 +235,7 @@ const Index = () => {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="generate" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="generate" className="flex items-center gap-2">
               <FileTextIcon className="w-4 h-4" />
               Generate Resume
@@ -240,9 +244,21 @@ const Index = () => {
               <BriefcaseIcon className="w-4 h-4" />
               Applications
             </TabsTrigger>
+            <TabsTrigger value="super-search" className="flex items-center gap-2">
+              <SparklesIcon className="w-4 h-4" />
+              🚀 Super Search
+            </TabsTrigger>
+            <TabsTrigger value="contact-test" className="flex items-center gap-2">
+              <UserIcon className="w-4 h-4" />
+              Contact Test
+            </TabsTrigger>
             <TabsTrigger value="web3-jobs" className="flex items-center gap-2">
               <GlobeIcon className="w-4 h-4" />
               Web3 Jobs
+            </TabsTrigger>
+            <TabsTrigger value="jsearch-test" className="flex items-center gap-2">
+              <SparklesIcon className="w-4 h-4" />
+              LinkedIn API Test
             </TabsTrigger>
             <TabsTrigger value="locations" className="flex items-center gap-2">
               <MapPinIcon className="w-4 h-4" />
@@ -345,41 +361,27 @@ const Index = () => {
 
           {/* Applications Tab */}
           <TabsContent value="applications" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Job Applications</CardTitle>
-                <CardDescription>
-                  Track all your job applications and resume versions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {applications.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <BriefcaseIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No applications yet. Generate your first resume to get started!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {applications.map((app, index) => (
-                      <Card key={index} className="border">
-                        <CardHeader>
-                          <CardTitle>{app.jobTitle}</CardTitle>
-                          <CardDescription>{app.company} - {app.date}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <pre className="whitespace-pre-wrap text-sm">{app.resume}</pre>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <ApplicationManager />
+          </TabsContent>
+
+          {/* Super Search Tab */}
+          <TabsContent value="super-search" className="mt-6">
+            <EnhancedJobScraper />
+          </TabsContent>
+
+          {/* Contact Test Tab */}
+          <TabsContent value="contact-test" className="mt-6">
+            <ContactInfoTest />
           </TabsContent>
 
           {/* Web3 Jobs Tab */}
           <TabsContent value="web3-jobs" className="mt-6">
             <JobScraper />
+          </TabsContent>
+
+          {/* JSearch API Test Tab */}
+          <TabsContent value="jsearch-test" className="mt-6">
+            <JSearchTest />
           </TabsContent>
 
           {/* Locations Tab */}

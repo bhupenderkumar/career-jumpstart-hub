@@ -6,10 +6,10 @@ interface ModernPDFOptions {
   country: string;
 }
 
-// Extract name and role for filename
-const extractNameAndRole = (resume: string): { name: string; role: string } => {
+// Extract name, role, and company for filename
+const extractNameRoleAndCompany = (resume: string): { name: string; role: string; company: string } => {
   const lines = resume.split('\n').map(line => line.trim()).filter(line => line);
-  
+
   let name = 'resume';
   if (lines.length > 0) {
     name = lines[0]
@@ -21,7 +21,7 @@ const extractNameAndRole = (resume: string): { name: string; role: string } => {
       .join('_')
       .toLowerCase();
   }
-  
+
   let role = 'professional';
   const roleKeywords = [
     'engineer', 'developer', 'architect', 'manager', 'lead', 'senior', 'junior',
@@ -29,7 +29,7 @@ const extractNameAndRole = (resume: string): { name: string; role: string } => {
     'full stack', 'backend', 'frontend', 'software', 'web', 'mobile', 'devops',
     'data', 'machine learning', 'ai', 'blockchain', 'cloud'
   ];
-  
+
   const resumeText = resume.toLowerCase();
   for (const keyword of roleKeywords) {
     if (resumeText.includes(keyword)) {
@@ -37,16 +37,51 @@ const extractNameAndRole = (resume: string): { name: string; role: string } => {
       break;
     }
   }
-  
-  return { name: name || 'resume', role };
+
+  // Extract company name from job descriptions or cover letter
+  let company = '';
+  const companyPatterns = [
+    /(?:dear\s+(?:hiring\s+manager\s+at\s+|team\s+at\s+)?|application\s+(?:for|to)\s+|position\s+at\s+|work\s+(?:at|for)\s+|join\s+(?:the\s+team\s+at\s+)?|interested\s+in\s+)([A-Z][a-zA-Z\s&.,'-]+?)(?:\s+(?:team|company|corporation|inc|ltd|llc|as|for|in|to|and|,|\.|!|\?))/gi,
+    /([A-Z][a-zA-Z\s&.,'-]+?)\s+(?:company|corporation|inc|ltd|llc|team|hiring|position|role|job|opportunity)/gi,
+    /(?:at|with|for)\s+([A-Z][a-zA-Z\s&.,'-]{2,30}?)(?:\s+(?:as|in|for|,|\.|!|\?|$))/gi
+  ];
+
+  for (const pattern of companyPatterns) {
+    const matches = [...resume.matchAll(pattern)];
+    if (matches.length > 0) {
+      const potentialCompany = matches[0][1]
+        .trim()
+        .replace(/[^a-zA-Z\s&]/g, '')
+        .replace(/\s+/g, '_')
+        .toLowerCase()
+        .substring(0, 20); // Limit length
+
+      if (potentialCompany.length > 2 && !potentialCompany.includes('hiring') && !potentialCompany.includes('manager')) {
+        company = potentialCompany;
+        break;
+      }
+    }
+  }
+
+  return { name: name || 'resume', role, company };
 };
 
 // Specialized function for cover letter formatting
-const generateCoverLetterPDF = (pdf: any, lines: string[], colors: any, margin: number, maxWidth: number, pageHeight: number, addText: any, checkPageBreak: any, country: string) => {
+const generateCoverLetterPDF = (pdf: any, lines: string[], colors: any, margin: number, maxWidth: number, pageHeight: number, addText: any, country: string) => {
   let y = margin;
   let inHeader = true;
   let inDate = false;
   let inBody = false;
+
+  // Function to add new page if needed
+  const checkPageBreak = (requiredSpace: number = 15) => {
+    if (y > pageHeight - requiredSpace) {
+      pdf.addPage();
+      y = margin;
+      return true;
+    }
+    return false;
+  };
 
   for (const line of lines) {
     const cleanLine = line.trim();
@@ -104,9 +139,11 @@ const generateCoverLetterPDF = (pdf: any, lines: string[], colors: any, margin: 
   }
 
   // Generate filename
-  const { name } = extractNameAndRole(lines.join(' '));
+  const { name, company } = extractNameRoleAndCompany(lines.join(' '));
   const countryCode = country.toLowerCase().replace(/[^a-z]/g, '').replace('international', '');
-  const fileName = countryCode ? `${name}_cover_letter_${countryCode}.pdf` : `${name}_cover_letter.pdf`;
+  const fileName = company
+    ? (countryCode ? `${name}_cover_letter_${company}_${countryCode}.pdf` : `${name}_cover_letter_${company}.pdf`)
+    : (countryCode ? `${name}_cover_letter_${countryCode}.pdf` : `${name}_cover_letter.pdf`);
 
   console.log('Saving cover letter PDF as:', fileName);
   pdf.save(fileName);
@@ -218,7 +255,7 @@ export const generateModernPDF = ({ resume, language, country }: ModernPDFOption
 
     // Handle cover letters differently
     if (isCoverLetter) {
-      return generateCoverLetterPDF(pdf, lines, colors, margin, maxWidth, pageHeight, addText, checkPageBreak, country);
+      return generateCoverLetterPDF(pdf, lines, colors, margin, maxWidth, pageHeight, addText, country);
     }
 
     let isFirstLine = true;
@@ -364,9 +401,11 @@ export const generateModernPDF = ({ resume, language, country }: ModernPDFOption
     // No footer - removed as requested
 
     // Generate filename
-    const { name, role } = extractNameAndRole(resume);
+    const { name, role, company } = extractNameRoleAndCompany(resume);
     const countryCode = country.toLowerCase().replace(/[^a-z]/g, '').replace('international', '');
-    const fileName = countryCode ? `${name}_${role}_${countryCode}_resume.pdf` : `${name}_${role}_resume.pdf`;
+    const fileName = company
+      ? (countryCode ? `${name}_${role}_${company}_${countryCode}_resume.pdf` : `${name}_${role}_${company}_resume.pdf`)
+      : (countryCode ? `${name}_${role}_${countryCode}_resume.pdf` : `${name}_${role}_resume.pdf`);
 
     console.log('Saving modern PDF as:', fileName);
     pdf.save(fileName);

@@ -1,15 +1,25 @@
 import React from 'react';
 
 interface ResumeRendererProps {
-  content: string;
+  content?: string;
   className?: string;
 }
 
 const ResumeRenderer: React.FC<ResumeRendererProps> = ({ content, className = "" }) => {
+  // Handle undefined or null content
+  if (!content) {
+    return (
+      <div className={`resume-content ${className}`}>
+        <p className="text-gray-500 text-center py-8">No resume content available</p>
+      </div>
+    );
+  }
   const parseResumeContent = (text: string) => {
+    if (!text) return [];
+
     const lines = text.split('\n');
     const sections: Array<{ type: string; content: string; level?: number }> = [];
-    
+
     lines.forEach(line => {
       const trimmedLine = line.trim();
       if (!trimmedLine) return;
@@ -153,69 +163,7 @@ const ResumeRenderer: React.FC<ResumeRendererProps> = ({ content, className = ""
         {sections.map((section, index) => renderSection(section, index))}
       </div>
       
-      <style jsx>{`
-        .resume-content {
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          line-height: 1.6;
-        }
-        
-        .resume-content h1 {
-          letter-spacing: 0.05em;
-        }
-        
-        .resume-content h2 {
-          position: relative;
-        }
-        
-        .resume-content h2::after {
-          content: '';
-          position: absolute;
-          bottom: -2px;
-          left: 0;
-          width: 50px;
-          height: 2px;
-          background: linear-gradient(90deg, #2563eb, #3b82f6);
-        }
-        
-        .resume-content strong {
-          font-weight: 600;
-          color: #1f2937;
-        }
-        
-        .resume-content em {
-          font-style: italic;
-          color: #4b5563;
-        }
-        
-        .resume-content a {
-          transition: all 0.2s ease;
-        }
-        
-        .resume-content a:hover {
-          color: #1d4ed8;
-        }
-        
-        @media print {
-          .resume-content {
-            font-size: 12px;
-            line-height: 1.4;
-          }
-          
-          .resume-content h1 {
-            font-size: 24px;
-          }
-          
-          .resume-content h2 {
-            font-size: 16px;
-            page-break-after: avoid;
-          }
-          
-          .resume-content h3 {
-            font-size: 14px;
-            page-break-after: avoid;
-          }
-        }
-      `}</style>
+
     </div>
   );
 };

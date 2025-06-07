@@ -218,11 +218,11 @@ export const generateSimplePDF = ({ resume, language, country }: SimplePDFOption
         // Section title
         y = addText(cleanLine, margin, y, 11, 'bold', colors.primary);
 
-        // Underline
+        // Underline - better positioned
         pdf.setDrawColor(colors.accent[0], colors.accent[1], colors.accent[2]);
-        pdf.setLineWidth(1.5);
-        pdf.line(margin, y + 1, margin + 60, y + 1);
-        y += 4;
+        pdf.setLineWidth(1);
+        pdf.line(margin, y + 2, margin + 60, y + 2);
+        y += 6;
 
       } else if (isFirstLine) {
         // Name - better formatting
@@ -274,13 +274,7 @@ export const generateSimplePDF = ({ resume, language, country }: SimplePDFOption
       lineIndex++;
     }
 
-    // Footer
-    pdf.setFontSize(7);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(150, 150, 150);
-    const footerText = `AI-Optimized for ${country} | Generated ${new Date().toLocaleDateString()}`;
-    const footerWidth = pdf.getTextWidth(footerText);
-    pdf.text(footerText, (pageWidth - footerWidth) / 2, pageHeight - 10);
+    // Remove footer for cleaner look
 
     // Generate filename
     const { name, role } = extractNameAndRole(resume);

@@ -20,7 +20,8 @@ import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
 import ResumeRenderer from "@/components/ResumeRenderer";
 import PDFPreview from "@/components/PDFPreview";
-import { generateModernPDF } from "@/utils/modernPDFGenerator";
+import { generateEnhancedPDF } from "@/utils/enhancedPDFGenerator";
+import PWADownloadPrompt from "@/components/PWADownloadPrompt";
 
 interface DocumentGeneratorProps {
   jobDescription: string;
@@ -40,6 +41,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
   const [activeTab, setActiveTab] = useState("resume");
   const [enhancementPrompt, setEnhancementPrompt] = useState("");
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [showPWAPrompt, setShowPWAPrompt] = useState(false);
+  const [downloadInfo, setDownloadInfo] = useState<{type: 'resume' | 'cover-letter' | 'email', fileName?: string}>({type: 'resume'});
   const { toast } = useToast();
 
   const handleGenerateAll = async () => {
@@ -63,6 +66,10 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       });
 
       setDocuments(result);
+
+      // Save application to localStorage for tracking
+      saveApplicationToStorage(result);
+
       toast({
         title: "Documents Generated Successfully",
         description: "Resume, cover letter, and email template are ready!",
@@ -138,16 +145,26 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      generateModernPDF({
+      generateEnhancedPDF({
         resume: documents.resume,
         language,
-        country
+        country,
+        type: 'resume'
       });
+
+      // Extract filename for display
+      const lines = documents.resume.split('\n').map(line => line.trim()).filter(line => line);
+      const name = lines.length > 0 ? lines[0].replace(/\*\*/g, '').replace(/[^a-zA-Z\s]/g, '').trim().split(' ').slice(0, 2).join('_').toLowerCase() : 'resume';
+      const fileName = `${name}_resume.pdf`;
 
       toast({
         title: "Resume Downloaded",
         description: "Professional PDF resume has been downloaded successfully!",
       });
+
+      // Show PWA install prompt after successful download
+      setDownloadInfo({ type: 'resume', fileName });
+      setShowPWAPrompt(true);
     } catch (error) {
       console.error('PDF generation error:', error);
       toast({
@@ -169,16 +186,26 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      generateModernPDF({
+      generateEnhancedPDF({
         resume: documents.coverLetter,
         language,
-        country
+        country,
+        type: 'cover-letter'
       });
+
+      // Extract filename for display
+      const lines = documents.coverLetter.split('\n').map(line => line.trim()).filter(line => line);
+      const name = lines.length > 0 ? lines[0].replace(/\*\*/g, '').replace(/[^a-zA-Z\s]/g, '').trim().split(' ').slice(0, 2).join('_').toLowerCase() : 'cover_letter';
+      const fileName = `${name}_cover_letter.pdf`;
 
       toast({
         title: "Cover Letter Downloaded",
         description: "Professional PDF cover letter has been downloaded successfully!",
       });
+
+      // Show PWA install prompt after successful download
+      setDownloadInfo({ type: 'cover-letter', fileName });
+      setShowPWAPrompt(true);
     } catch (error) {
       console.error('PDF generation error:', error);
       toast({
@@ -196,6 +223,74 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
         description: `${type} has been copied to your clipboard.`,
       });
     });
+  };
+
+  // Save application to localStorage for tracking
+  const saveApplicationToStorage = (documents: any) => {
+    try {
+      // Extract job title and company from job description
+      const jobLines = jobDescription.split('\n').filter(line => line.trim());
+      let jobTitle = 'Unknown Position';
+      let company = 'Unknown Company';
+
+      // Try to extract job title (usually in first few lines)
+      for (const line of jobLines.slice(0, 5)) {
+        if (line.toLowerCase().includes('position') ||
+            line.toLowerCase().includes('role') ||
+            line.toLowerCase().includes('job title') ||
+            line.toLowerCase().includes('we are looking for') ||
+            line.toLowerCase().includes('seeking')) {
+          jobTitle = line.replace(/[^\w\s]/g, '').trim().substring(0, 50);
+          break;
+        }
+      }
+
+      // Try to extract company name
+      for (const line of jobLines.slice(0, 10)) {
+        if (line.toLowerCase().includes('company') ||
+            line.toLowerCase().includes('about us') ||
+            line.toLowerCase().includes('join') ||
+            line.toLowerCase().includes('at ')) {
+          const companyMatch = line.match(/(?:at|join|company:?\s*)([A-Z][a-zA-Z\s&.,'-]+?)(?:\s|,|\.|\n|$)/i);
+          if (companyMatch) {
+            company = companyMatch[1].trim().substring(0, 30);
+            break;
+          }
+        }
+      }
+
+      // Create application object
+      const application = {
+        id: Date.now().toString(),
+        jobTitle,
+        company,
+        jobDescription,
+        resume: documents.resume || '',
+        coverLetter: documents.coverLetter || '',
+        email: documents.email || '',
+        language,
+        country,
+        date: new Date().toLocaleDateString(),
+        timestamp: new Date().toISOString(),
+        version: 1
+      };
+
+      // Get existing applications
+      const existingApplications = JSON.parse(localStorage.getItem('applications') || '[]');
+
+      // Add new application
+      existingApplications.push(application);
+
+      // Save back to localStorage
+      localStorage.setItem('applications', JSON.stringify(existingApplications));
+
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('applicationsUpdated'));
+
+      console.log('Application saved to storage:', application);
+    } catch (error) {
+      console.error('Error saving application:', error);
+    }
   };
 
   return (
@@ -406,6 +501,14 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
           </div>
         )}
       </CardContent>
+
+      {/* PWA Download Prompt */}
+      <PWADownloadPrompt
+        show={showPWAPrompt}
+        onClose={() => setShowPWAPrompt(false)}
+        downloadType={downloadInfo.type}
+        fileName={downloadInfo.fileName}
+      />
     </Card>
   );
 };
