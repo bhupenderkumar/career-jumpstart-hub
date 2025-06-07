@@ -141,34 +141,56 @@ const EnhancedJobScraper = () => {
   }, [allJobs, locationFilter, salaryFilter, companyFilter, easyApplyOnly, linkedinOnly]);
 
   const loadJobs = async (resetPage = true) => {
-    if (resetPage) {
-      setIsLoading(true);
-      setCurrentPage(1);
-      setAllJobs([]);
-    } else {
-      setIsLoadingMore(true);
-    }
-
     try {
-      const result: JobScrapingResult = await scrapeWeb3Jobs(resetPage ? 1 : currentPage, searchTerm);
+      if (resetPage) {
+        setIsLoading(true);
+        setCurrentPage(1);
+        setAllJobs([]);
+      } else {
+        setIsLoadingMore(true);
+      }
+
+      // Load multiple pages in parallel for initial load
+      const pagesToLoad = resetPage ? 3 : 1;
+      const startPage = resetPage ? 1 : currentPage;
+      const promises = [];
+
+      for (let i = 0; i < pagesToLoad; i++) {
+        promises.push(scrapeWeb3Jobs(startPage + i, searchTerm));
+      }
+
+      const results = await Promise.all(promises);
+      let combinedJobs: Job[] = [];
+      let maxTotalCount = 0;
+      let lastHasNextPage = false;
+
+      results.forEach((result) => {
+        combinedJobs = [...combinedJobs, ...result.jobs];
+        maxTotalCount = Math.max(maxTotalCount, result.totalCount);
+        lastHasNextPage = result.hasNextPage;
+      });
 
       if (resetPage) {
-        setJobs(result.jobs);
-        setAllJobs(result.jobs);
+        setJobs(combinedJobs);
+        setAllJobs(combinedJobs);
       } else {
-        // Append new jobs to existing ones
-        const newJobs = [...allJobs, ...result.jobs];
+        // Append new jobs to existing ones, removing duplicates by ID
+        const allJobIds = new Set(allJobs.map(job => job.id));
+        const uniqueNewJobs = combinedJobs.filter(job => !allJobIds.has(job.id));
+        const newJobs = [...allJobs, ...uniqueNewJobs];
         setJobs(newJobs);
         setAllJobs(newJobs);
       }
 
-      setTotalCount(result.totalCount);
-      setHasNextPage(result.hasNextPage);
-
-      toast({
-        title: "Jobs Loaded",
-        description: `Found ${result.jobs.length} ${searchTerm} jobs on page ${resetPage ? 1 : currentPage}`,
-      });
+      setTotalCount(maxTotalCount);
+      setHasNextPage(lastHasNextPage);
+      
+      if (combinedJobs.length > 0) {
+        toast({
+          title: "Jobs Loaded",
+          description: `Found ${combinedJobs.length} ${searchTerm} jobs${resetPage ? '' : ` on page ${currentPage}`}`,
+        });
+      }
     } catch (error) {
       console.error('Error loading jobs:', error);
       toast({
@@ -185,9 +207,37 @@ const EnhancedJobScraper = () => {
   const loadMoreJobs = async () => {
     if (!hasNextPage || isLoadingMore) return;
 
-    setCurrentPage(prev => prev + 1);
-    // Wait for state update then load
-    setTimeout(() => loadJobs(false), 100);
+    const nextPage = currentPage + 1;
+    setCurrentPage(nextPage);
+
+    try {
+      const result = await scrapeWeb3Jobs(nextPage, searchTerm);
+      
+      // Remove duplicates when adding new jobs
+      const allJobIds = new Set(allJobs.map(job => job.id));
+      const uniqueNewJobs = result.jobs.filter(job => !allJobIds.has(job.id));
+      
+      if (uniqueNewJobs.length > 0) {
+        const newJobs = [...allJobs, ...uniqueNewJobs];
+        setJobs(newJobs);
+        setAllJobs(newJobs);
+        setHasNextPage(result.hasNextPage);
+        setTotalCount(Math.max(totalCount, result.totalCount));
+      } else if (hasNextPage) {
+        // If no new unique jobs but hasNextPage is true, try next page
+        setCurrentPage(nextPage + 1);
+        loadMoreJobs();
+      }
+    } catch (error) {
+      console.error('Error loading more jobs:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load more jobs. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingMore(false);
+    }
   };
 
   const loadApplications = () => {
@@ -1455,37 +1505,79 @@ Best regards,
             ))}
           </div>
 
-          {/* Load More Section */}
-          <div className="flex flex-col items-center mt-6 space-y-4">
-            <div className="text-sm text-gray-600 dark:text-gray-300 text-center">
-              Showing {allJobs.length} of {totalCount.toLocaleString()} jobs
-              {currentPage > 1 && ` • Page ${currentPage}`}
+          {/* Enhanced Load More Section */}
+          <div className="flex flex-col items-center mt-6 space-y-6">
+            {/* Status Bar */}
+            <div className="w-full max-w-2xl bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium">
+                  {isLoading ? (
+                    <span className="text-blue-600 flex items-center gap-2">
+                      <RefreshCwIcon className="w-3 h-3 animate-spin" />
+                      Searching...
+                    </span>
+                  ) : (
+                    <span>
+                      Showing {filteredJobs.length} of {totalCount.toLocaleString()} jobs
+                    </span>
+                  )}
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  Page {currentPage} of {Math.max(Math.ceil(totalCount / 10), 1)}
+                </Badge>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min((allJobs.length / totalCount) * 100, 100)}%` }}
+                />
+              </div>
             </div>
 
-            {hasNextPage && (
+            {/* Load More Button */}
+            {hasNextPage && !isLoading && (
               <Button
                 onClick={loadMoreJobs}
-                disabled={isLoadingMore || isLoading}
-                variant="outline"
-                className="w-full max-w-md"
+                disabled={isLoadingMore}
+                className="w-full max-w-md bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
               >
                 {isLoadingMore ? (
-                  <>
-                    <RefreshCwIcon className="w-4 h-4 mr-2 animate-spin" />
-                    Loading More Jobs...
-                  </>
+                  <div className="flex items-center gap-2">
+                    <RefreshCwIcon className="w-4 h-4 animate-spin" />
+                    <span>Loading Page {currentPage + 1}...</span>
+                  </div>
                 ) : (
-                  <>
-                    <DownloadIcon className="w-4 h-4 mr-2" />
-                    Load More Jobs
-                  </>
+                  <div className="flex items-center gap-2">
+                    <DownloadIcon className="w-4 h-4" />
+                    <span>Load More Jobs (Page {currentPage + 1})</span>
+                  </div>
                 )}
               </Button>
             )}
 
-            {!hasNextPage && allJobs.length > 0 && (
-              <div className="text-sm text-gray-500 text-center">
-                🎉 You've seen all available jobs for "{searchTerm}"
+            {/* End of Results Message */}
+            {!isLoading && !hasNextPage && allJobs.length > 0 && (
+              <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <Badge variant="secondary" className="bg-green-100 text-green-800 mb-2">
+                  🎉 All Jobs Loaded
+                </Badge>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  You've seen all {allJobs.length} available jobs for "{searchTerm}"
+                </p>
+              </div>
+            )}
+
+            {/* No Results Message */}
+            {!isLoading && allJobs.length === 0 && (
+              <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 mb-2">
+                  No jobs found
+                </Badge>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Try adjusting your search terms or filters
+                </p>
               </div>
             )}
           </div>

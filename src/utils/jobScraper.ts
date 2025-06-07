@@ -422,13 +422,14 @@ async function fetchFromJSearch(page: number, searchTerm: string = ''): Promise<
       params: {
         query: query,
         page: page.toString(),
-        num_pages: "1",
-        date_posted: "all", // Get all recent jobs
+        num_pages: "5", // Increased number of pages per request
+        page_size: "50", // Increased results per page
+        date_posted: "month", // Get jobs posted in last month
         remote_jobs_only: "false",
-        employment_types: "FULLTIME,CONTRACTOR,PARTTIME",
+        employment_types: "FULLTIME,CONTRACTOR,PARTTIME,INTERN",
         job_requirements: "NO_EXPERIENCE,UNDER_3_YEARS_EXPERIENCE,MORE_THAN_3_YEARS_EXPERIENCE",
-        radius: "100", // Search within 100 miles
-        job_title: "exact" // Exact match for job titles when possible
+        radius: "500", // Increased search radius
+        job_title: "broad" // Allow broader matches for job titles
       },
       headers: {
         'X-RapidAPI-Key': rapidApiKey,
@@ -482,9 +483,9 @@ async function fetchFromJSearch(page: number, searchTerm: string = ''): Promise<
 
       return {
         jobs,
-        totalCount: response.data.total_count || jobs.length,
+        totalCount: response.data.total_count || jobs.length * 5, // Estimate total count if not provided
         currentPage: page,
-        hasNextPage: jobs.length === 10 && response.data.total_count > page * 10
+        hasNextPage: jobs.length >= 45 || response.data.total_count > (page * 50) // More lenient next page check
       };
     }
 
