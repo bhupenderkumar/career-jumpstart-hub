@@ -1,9 +1,9 @@
-
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getUserEnvVar } from './env';
 
 // Initialize the Gemini AI client
 const getGeminiClient = () => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = getUserEnvVar('VITE_GEMINI_API_KEY');
   
   if (!apiKey) {
     throw new Error('VITE_GEMINI_API_KEY is not configured. Please add your Gemini API key to the environment variables.');

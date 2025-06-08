@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import EnhancedJobScraper from "@/components/EnhancedJobScraper";
 import JSearchTest from "@/components/JSearchTest";
+import { getUserEnvVar } from '../services/env';
 
 const SuperJobSearch = () => {
   const [activeTab, setActiveTab] = useState("search");

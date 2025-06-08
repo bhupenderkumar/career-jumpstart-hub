@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import EnhancedJobScraper from "@/components/EnhancedJobScraper";
 import { JOB_API_CONFIG, EMAIL_TEMPLATES } from "@/config/jobApis";
+import { getUserEnvVar } from '../services/env';
 
 const JobSearchDemo = () => {
   const [activeTab, setActiveTab] = useState("search");

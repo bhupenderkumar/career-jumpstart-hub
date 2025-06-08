@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useInView } from "react-intersection-observer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -65,6 +65,7 @@ import { generateSimplePDF } from "@/utils/simplePDFGenerator";
 import { generateDocumentPDF } from "@/utils/documentPDFGenerator";
 import PDFPreview from "@/components/PDFPreview";
 import ResumeRenderer from "@/components/ResumeRenderer";
+import { getUserEnvVar, setUserEnvVar } from '../services/env';
 
 const EnhancedJobScraper = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -113,6 +114,16 @@ const EnhancedJobScraper = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editableResume, setEditableResume] = useState("");
 
+  // Add state for language and country selection
+  const [selectedLanguage, setSelectedLanguage] = useState("en");
+  const [selectedCountry, setSelectedCountry] = useState("International");
+
+  // Add state for env variable popup
+  const [showEnvDialog, setShowEnvDialog] = useState(false);
+  const [envKeyInput, setEnvKeyInput] = useState("");
+  const [envValueInput, setEnvValueInput] = useState("");
+  const [envVars, setEnvVars] = useState<{ [key: string]: string }>({});
+
   const { toast } = useToast();
 
   // Infinite scroll handler
@@ -139,6 +150,14 @@ const EnhancedJobScraper = () => {
   useEffect(() => {
     applyFilters();
   }, [allJobs, locationFilter, salaryFilter, companyFilter, easyApplyOnly, linkedinOnly]);
+
+  // On mount, load env vars from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem("userEnvVars");
+    if (stored) {
+      setEnvVars(JSON.parse(stored));
+    }
+  }, []);
 
   const loadJobs = async (resetPage = true) => {
     try {
@@ -442,8 +461,8 @@ ${contactInfo.location ? `   - Location: ${contactInfo.location}` : ''}
         jobDescription: jobDescriptionForAI,
         baseResume: baseResume || undefined,
         editPrompt: editPrompt || undefined,
-        language: "en",
-        country: "International"
+        language: selectedLanguage,
+        country: selectedCountry
       });
 
       setGeneratedResume(aiResume);
@@ -812,8 +831,8 @@ Apply URL: ${job.applyUrl}
       const result = await generateAllDocuments({
         jobDescription,
         baseResume: baseResume || undefined,
-        language: "en",
-        country: "International",
+        language: selectedLanguage,
+        country: selectedCountry,
         generateType: 'all'
       });
 
@@ -924,6 +943,53 @@ Best regards,
 
   return (
     <div className="space-y-6">
+      {/* Env Variable Dialog */}
+      <Dialog open={showEnvDialog} onOpenChange={setShowEnvDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Set API Keys / Environment Variables</DialogTitle>
+            <DialogDescription>
+              Enter the environment variable key and value (e.g. VITE_GEMINI_API_KEY). This will be saved in your browser localStorage and used for AI features.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <input
+              className="w-full border rounded px-2 py-1"
+              placeholder="Variable Key (e.g. VITE_GEMINI_API_KEY)"
+              value={envKeyInput}
+              onChange={e => setEnvKeyInput(e.target.value)}
+            />
+            <input
+              className="w-full border rounded px-2 py-1"
+              placeholder="Value"
+              value={envValueInput}
+              onChange={e => setEnvValueInput(e.target.value)}
+            />
+            <button
+              className="w-full bg-blue-600 text-white rounded py-2 mt-2"
+              onClick={() => {
+                if (envKeyInput && envValueInput) {
+                  setUserEnvVar(envKeyInput, envValueInput);
+                  setEnvKeyInput("");
+                  setEnvValueInput("");
+                  setShowEnvDialog(false);
+                }
+              }}
+            >
+              Save
+            </button>
+            <div className="mt-2 text-xs text-gray-500">
+              <strong>Current Variables:</strong>
+              <ul>
+                {Object.entries(envVars).map(([k, v]) => (
+                  <li key={k}><span className="font-mono">{k}</span>: <span className="font-mono">{v.slice(0, 6)}...{v.slice(-4)}</span></li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Card className="w-full">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -931,15 +997,24 @@ Best regards,
               <BriefcaseIcon className="w-5 h-5 text-blue-600" />
               <CardTitle>Enhanced Job Search & Apply</CardTitle>
             </div>
-            <Button 
-              onClick={() => loadJobs(true)}
-              disabled={isLoading}
-              variant="outline"
-              size="sm"
-            >
-              <RefreshCwIcon className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              {isLoading ? 'Loading...' : 'Refresh'}
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => loadJobs(true)}
+                disabled={isLoading}
+                variant="outline"
+                size="sm"
+              >
+                <RefreshCwIcon className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                {isLoading ? 'Loading...' : 'Refresh'}
+              </Button>
+              <Button
+                onClick={() => setShowEnvDialog(true)}
+                variant="outline"
+                size="sm"
+              >
+                Set API Keys
+              </Button>
+            </div>
           </div>
           <CardDescription>
             Search jobs with AI-powered resume generation and one-click apply • {filteredJobs.length} of {totalCount.toLocaleString()} jobs • Page {currentPage}
@@ -2015,7 +2090,7 @@ Best regards,
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="bg-green-100 text-green-800">
-                      ✅ Complete Package
+                                           ✅ Complete Package
                     </Badge>
                     <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                       🎯 Job Tailored

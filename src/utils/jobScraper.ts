@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getUserEnvVar } from '../services/env';
 
 // Job interfaces - defining them here since types file doesn't exist yet
 export interface Job {
@@ -393,7 +394,7 @@ async function fetchFromArbeitnow(page: number, searchTerm: string = 'java'): Pr
 // Fetch jobs from JSearch API (LinkedIn alternative via RapidAPI)
 async function fetchFromJSearch(page: number, searchTerm: string = ''): Promise<JobScrapingResult> {
   try {
-    const rapidApiKey = import.meta.env.VITE_RAPIDAPI_KEY;
+    const rapidApiKey = getUserEnvVar('VITE_RAPIDAPI_KEY');
     if (!rapidApiKey) {
       console.warn('JSearch API key not configured');
       throw new Error('API key missing');

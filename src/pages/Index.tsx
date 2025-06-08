@@ -18,6 +18,7 @@ import LanguageSelector from "@/components/LanguageSelector";
 import DocumentGenerator from "@/components/DocumentGenerator";
 import ApplicationManager from "@/components/ApplicationManager";
 import { generateResumeWithAI } from "@/services/geminiAI";
+import { getUserEnvVar } from '../services/env';
 
 const Index = () => {
   const [jobDetails, setJobDetails] = useState("");
@@ -49,7 +50,7 @@ const Index = () => {
     }
 
     // Check if API key is configured
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const apiKey = getUserEnvVar('VITE_GEMINI_API_KEY');
     if (!apiKey || apiKey === 'your_gemini_api_key_here') {
       setShowApiKeyWarning(true);
     }
@@ -73,7 +74,7 @@ const Index = () => {
     }
 
     // Check if API key is configured
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const apiKey = getUserEnvVar('VITE_GEMINI_API_KEY');
     if (!apiKey || apiKey === 'your_gemini_api_key_here') {
       toast({
         title: "API Key Required",

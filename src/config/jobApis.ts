@@ -1,3 +1,5 @@
+import { getUserEnvVar } from '../services/env';
+
 // Job API Configuration
 // This file contains configuration for various job APIs that provide real job listings
 
@@ -29,11 +31,11 @@ export const JOB_API_CONFIG = {
   // JSearch via RapidAPI - LinkedIn alternative
   jsearch: {
     baseUrl: 'https://jsearch.p.rapidapi.com/search',
-    enabled: !!import.meta.env.VITE_RAPIDAPI_KEY,
+    enabled: !!getUserEnvVar('VITE_RAPIDAPI_KEY'),
     requiresAuth: true,
-    apiKey: import.meta.env.VITE_RAPIDAPI_KEY,
+    apiKey: getUserEnvVar('VITE_RAPIDAPI_KEY'),
     headers: {
-      'X-RapidAPI-Key': import.meta.env.VITE_RAPIDAPI_KEY,
+      'X-RapidAPI-Key': getUserEnvVar('VITE_RAPIDAPI_KEY'),
       'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
     },
     description: 'LinkedIn alternative via RapidAPI - includes LinkedIn jobs'
@@ -42,11 +44,11 @@ export const JOB_API_CONFIG = {
   // LinkedIn Jobs API via RapidAPI
   linkedinJobs: {
     baseUrl: 'https://linkedin-data-api.p.rapidapi.com/search-jobs',
-    enabled: !!import.meta.env.VITE_RAPIDAPI_KEY,
+    enabled: !!getUserEnvVar('VITE_RAPIDAPI_KEY'),
     requiresAuth: true,
-    apiKey: import.meta.env.VITE_RAPIDAPI_KEY,
+    apiKey: getUserEnvVar('VITE_RAPIDAPI_KEY'),
     headers: {
-      'X-RapidAPI-Key': import.meta.env.VITE_RAPIDAPI_KEY,
+      'X-RapidAPI-Key': getUserEnvVar('VITE_RAPIDAPI_KEY'),
       'X-RapidAPI-Host': 'linkedin-data-api.p.rapidapi.com'
     },
     description: 'Direct LinkedIn job data via RapidAPI'
@@ -55,21 +57,21 @@ export const JOB_API_CONFIG = {
   // Adzuna - Job aggregator with free tier
   adzuna: {
     baseUrl: 'https://api.adzuna.com/v1/api/jobs/us/search',
-    enabled: !!(import.meta.env.VITE_ADZUNA_APP_ID && import.meta.env.VITE_ADZUNA_APP_KEY),
+    enabled: !!(getUserEnvVar('VITE_ADZUNA_APP_ID') && getUserEnvVar('VITE_ADZUNA_APP_KEY')),
     requiresAuth: true,
-    appId: import.meta.env.VITE_ADZUNA_APP_ID,
-    appKey: import.meta.env.VITE_ADZUNA_APP_KEY,
+    appId: getUserEnvVar('VITE_ADZUNA_APP_ID'),
+    appKey: getUserEnvVar('VITE_ADZUNA_APP_KEY'),
     description: 'Adzuna job aggregator with free tier - includes LinkedIn jobs'
   },
 
   // Indeed Jobs via RapidAPI
   indeed: {
     baseUrl: 'https://indeed12.p.rapidapi.com/jobs/search',
-    enabled: !!import.meta.env.VITE_RAPIDAPI_KEY,
+    enabled: !!getUserEnvVar('VITE_RAPIDAPI_KEY'),
     requiresAuth: true,
-    apiKey: import.meta.env.VITE_RAPIDAPI_KEY,
+    apiKey: getUserEnvVar('VITE_RAPIDAPI_KEY'),
     headers: {
-      'X-RapidAPI-Key': import.meta.env.VITE_RAPIDAPI_KEY,
+      'X-RapidAPI-Key': getUserEnvVar('VITE_RAPIDAPI_KEY'),
       'X-RapidAPI-Host': 'indeed12.p.rapidapi.com'
     },
     description: 'Indeed job search via RapidAPI'
@@ -78,11 +80,11 @@ export const JOB_API_CONFIG = {
   // Glassdoor Jobs via RapidAPI
   glassdoor: {
     baseUrl: 'https://glassdoor-jobs1.p.rapidapi.com/jobs',
-    enabled: !!import.meta.env.VITE_RAPIDAPI_KEY,
+    enabled: !!getUserEnvVar('VITE_RAPIDAPI_KEY'),
     requiresAuth: true,
-    apiKey: import.meta.env.VITE_RAPIDAPI_KEY,
+    apiKey: getUserEnvVar('VITE_RAPIDAPI_KEY'),
     headers: {
-      'X-RapidAPI-Key': import.meta.env.VITE_RAPIDAPI_KEY,
+      'X-RapidAPI-Key': getUserEnvVar('VITE_RAPIDAPI_KEY'),
       'X-RapidAPI-Host': 'glassdoor-jobs1.p.rapidapi.com'
     },
     description: 'Glassdoor job search via RapidAPI'
@@ -218,11 +220,11 @@ export const getEnabledApis = () => {
 export const validateApiKeys = () => {
   const warnings: string[] = [];
   
-  if (!import.meta.env.VITE_RAPIDAPI_KEY) {
+  if (!getUserEnvVar('VITE_RAPIDAPI_KEY')) {
     warnings.push('VITE_RAPIDAPI_KEY not set - JSearch API disabled');
   }
   
-  if (!import.meta.env.VITE_ADZUNA_APP_ID || !import.meta.env.VITE_ADZUNA_APP_KEY) {
+  if (!getUserEnvVar('VITE_ADZUNA_APP_ID') || !getUserEnvVar('VITE_ADZUNA_APP_KEY')) {
     warnings.push('VITE_ADZUNA_APP_ID/VITE_ADZUNA_APP_KEY not set - Adzuna API disabled');
   }
   

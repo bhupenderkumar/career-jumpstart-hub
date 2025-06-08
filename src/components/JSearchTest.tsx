@@ -19,6 +19,7 @@ import {
   ZapIcon
 } from "lucide-react";
 import { Job, JobScrapingResult, scrapeWeb3Jobs } from "@/utils/jobScraper";
+import { getUserEnvVar } from '../services/env';
 
 const JSearchTest = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -65,7 +66,7 @@ const JSearchTest = () => {
   };
 
   const getAPIStatusInfo = () => {
-    const rapidApiKey = import.meta.env.VITE_RAPIDAPI_KEY;
+    const rapidApiKey = getUserEnvVar('VITE_RAPIDAPI_KEY');
     
     if (!rapidApiKey) {
       return {
@@ -131,9 +132,9 @@ const JSearchTest = () => {
                 {statusInfo.message}
               </span>
             </div>
-            {import.meta.env.VITE_RAPIDAPI_KEY && (
+            {getUserEnvVar('VITE_RAPIDAPI_KEY') && (
               <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                API Key: {import.meta.env.VITE_RAPIDAPI_KEY.substring(0, 8)}...
+                API Key: {getUserEnvVar('VITE_RAPIDAPI_KEY').substring(0, 8)}...
               </div>
             )}
           </div>
@@ -150,7 +151,7 @@ const JSearchTest = () => {
             </div>
             <Button 
               onClick={testJSearchAPI} 
-              disabled={isLoading || !import.meta.env.VITE_RAPIDAPI_KEY}
+              disabled={isLoading || !getUserEnvVar('VITE_RAPIDAPI_KEY')}
             >
               <SearchIcon className="w-4 h-4 mr-2" />
               {isLoading ? 'Testing...' : 'Test API'}
@@ -263,7 +264,7 @@ const JSearchTest = () => {
           )}
 
           {/* Instructions */}
-          {!import.meta.env.VITE_RAPIDAPI_KEY && (
+          {!getUserEnvVar('VITE_RAPIDAPI_KEY') && (
             <div className="p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-900/20">
               <h4 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
                 Setup Required
