@@ -1,15 +1,21 @@
 import jsPDF from 'jspdf';
 
 interface PDFGeneratorOptions {
-  resume: string;
+  resume?: string;
+  coverLetter?: string;
   language: string;
   country: string;
   type?: 'resume' | 'cover-letter' | 'email';
 }
 
 // Extract name and role from resume for filename
-const extractNameAndRole = (resume: string): { name: string; role: string } => {
-  const lines = resume.split('\n').map(line => line.trim()).filter(line => line);
+const extractNameAndRole = (resume: string | undefined, coverLetter?: string | undefined): { name: string; role: string } => {
+  const text = resume || coverLetter;
+  if (!text) {
+    return { name: 'document', role: 'professional' };
+  }
+
+  const lines = text.split('\n').map(line => line.trim()).filter(line => line);
 
   // Extract name (usually first line, remove markdown)
   let name = 'Resume';
@@ -44,7 +50,7 @@ const extractNameAndRole = (resume: string): { name: string; role: string } => {
   return { name: name || 'resume', role };
 };
 
-export const generateEnhancedPDF = ({ resume, language, country, type = 'resume' }: PDFGeneratorOptions) => {
+export const generateEnhancedPDF = ({ resume, coverLetter, language, country, type = 'resume' }: PDFGeneratorOptions) => {
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;
@@ -163,13 +169,13 @@ export const generateEnhancedPDF = ({ resume, language, country, type = 'resume'
 
     // Simple but effective section header
     // Adjust section styling based on document type
-    const headerHeight = type === 'cover-letter' ? 14 : type === 'email' ? 10 : 12;
+    const headerHeight = type === 'cover-letter' ? 50 : type === 'email' ? 30 : 40;
     const headerBg = type === 'email' ? colors.background : colors.highlight;
-    addBackground(0, yPos - 4, pageWidth, headerHeight, headerBg);
+    addBackground(0, 0, pageWidth, headerHeight, headerBg);
 
     // Adjust section title styling
     const titleStyle = type === 'cover-letter' ? {
-      fontSize: 13,
+      fontSize: 22,
       fontStyle: 'bold',
       color: colors.primary
     } : type === 'email' ? {
@@ -182,7 +188,7 @@ export const generateEnhancedPDF = ({ resume, language, country, type = 'resume'
       color: colors.primary
     };
 
-    yPos = addText(title.toUpperCase(), margin, yPos + 4, titleStyle);
+    yPos = addText(title.toUpperCase(), margin, 23, titleStyle);
 
     // Subtle accent line
     addLine(margin, yPos + 3, pageWidth - margin, yPos + 3, colors.accent, 0.5);
@@ -192,6 +198,77 @@ export const generateEnhancedPDF = ({ resume, language, country, type = 'resume'
     content.forEach(item => {
       const cleanItem = cleanText(item);
       if (!cleanItem) return;
+
+      // Limit professional summary to 3 lines
+      if (title === 'Professional Summary' && content.indexOf(item) > 2) {
+        return;
+      }
+
+      // Highlight key skills
+      let textStyle = type === 'cover-letter' ? {
+        fontSize: 11,
+        fontStyle: 'normal',
+        color: colors.secondary,
+        lineHeight: 1.6,
+        maxWidth: maxWidth - 10
+      } : type === 'email' ? {
+        fontSize: 10.5,
+        fontStyle: 'normal',
+        color: colors.secondary,
+        lineHeight: 1.5,
+        maxWidth: maxWidth - 8
+      } : {
+        fontSize: 10,
+        fontStyle: 'normal',
+        color: colors.secondary,
+        lineHeight: 1.4
+      };
+
+      if (title === 'Key Skills') {
+        textStyle = {
+          fontSize: 10,
+          fontStyle: 'bold',
+          color: colors.primary,
+          lineHeight: 1.4
+        };
+      }
+
+      // Separate companies, projects, and achievements
+      if (title === 'Work Experience' || title === 'Projects' || title === 'Achievements') {
+        if (cleanItem.includes('|')) {
+          const parts = cleanItem.split('|').map(p => p.trim());
+
+          // Job title with highlight background
+          const titleText = parts[0];
+          const titleWidth = pdf.getTextWidth(titleText);
+          
+          // Add highlight background
+          // Highlight important job titles
+          addBackground(margin - 2, yPos - 6, titleWidth + 4, 8, colors.highlight);
+          
+          // Add job title with better contrast
+          yPos = addText(titleText, margin, yPos, {
+            fontSize: 11.5,
+            fontStyle: 'bold',
+            color: colors.primary
+          });
+
+          // Company and dates (semi-bold, blue)
+          if (parts[1]) {
+            const companyY = yPos - 4; // Same line as title
+            addText(`| ${parts[1]}`, margin + pdf.getTextWidth(parts[0]) + 5, companyY, {
+              fontSize: 10,
+              fontStyle: 'bold',
+              color: colors.primary
+            });
+          }
+          yPos += 3;
+        } else {
+          yPos = addText(cleanItem, margin, yPos, textStyle);
+          yPos += type === 'cover-letter' ? 4 : type === 'email' ? 3 : 2;
+        }
+        return;
+      }
 
       // Check if we need a new page before adding content
       if (yPos > pageHeight - 25) {
@@ -251,26 +328,6 @@ export const generateEnhancedPDF = ({ resume, language, country, type = 'resume'
         yPos += 3;
 
       } else {
-        // Adjust text style based on document type
-        const textStyle = type === 'cover-letter' ? {
-          fontSize: 11,
-          fontStyle: 'normal',
-          color: colors.secondary,
-          lineHeight: 1.6,
-          maxWidth: maxWidth - 10
-        } : type === 'email' ? {
-          fontSize: 10.5,
-          fontStyle: 'normal',
-          color: colors.secondary,
-          lineHeight: 1.5,
-          maxWidth: maxWidth - 8
-        } : {
-          fontSize: 10,
-          fontStyle: 'normal',
-          color: colors.secondary,
-          lineHeight: 1.4
-        };
-
         yPos = addText(cleanItem, margin, yPos, textStyle);
         yPos += type === 'cover-letter' ? 4 : type === 'email' ? 3 : 2;
       }
@@ -294,7 +351,8 @@ export const generateEnhancedPDF = ({ resume, language, country, type = 'resume'
         line.includes('SKILLS') || line.includes('EXPERIENCE') ||
         line.includes('EDUCATION') || line.includes('WORK') ||
         line.includes('ADDITIONAL') || line.includes('CERTIFICATIONS') ||
-        line.includes('PROJECTS') || line.includes('LANGUAGES')
+        line.includes('PROJECTS') || line.includes('LANGUAGES') ||
+        line.includes('ACHIEVEMENTS')
       );
 
       if (isSection) {
@@ -327,17 +385,18 @@ export const generateEnhancedPDF = ({ resume, language, country, type = 'resume'
   };
 
   try {
-    const { sections, headerInfo } = parseResume(resume);
+    const { sections, headerInfo } = parseResume(resume || coverLetter || '');
 
     // Different header styling based on document type
     if (headerInfo.length > 0) {
       if (type === 'cover-letter') {
         // Header background with larger height for cover letter
-        addBackground(0, 0, pageWidth, 45, colors.highlight);
-        addBackground(0, 40, pageWidth, 5, colors.background);
+        // Add background with a softer color
+addBackground(0, 0, pageWidth, 50, [230, 235, 240]);
+        addBackground(0, 45, pageWidth, 5, colors.background);
         
-        const date = new Date().toLocaleDateString();
-        y = addText(date, pageWidth - margin - 40, y + 8, {
+        const currentDate = new Date().toLocaleDateString();
+        y = addText(currentDate, pageWidth - margin - 40, 23, {
           fontSize: 10,
           color: colors.secondary,
           align: 'right'
@@ -355,8 +414,8 @@ export const generateEnhancedPDF = ({ resume, language, country, type = 'resume'
 
       // Name (large, bold, primary color)
       const name = cleanText(headerInfo[0]);
-      y = addText(name, margin, y + 8, {
-        fontSize: type === 'cover-letter' ? 18 : type === 'email' ? 16 : 20,
+y = addText(name, margin, 18, {
+        fontSize: type === 'cover-letter' ? 24 : type === 'email' ? 16 : 20,
         fontStyle: 'bold',
         color: colors.primary,
         align: type === 'cover-letter' ? 'right' : 'left'
@@ -366,7 +425,7 @@ export const generateEnhancedPDF = ({ resume, language, country, type = 'resume'
       // Title/Role (medium, normal, secondary color)
       if (headerInfo[1]) {
         const title = cleanText(headerInfo[1]);
-        y = addText(title, margin, y, {
+        y = addText(title, margin, 28, {
           fontSize: 12,
           color: colors.secondary,
           fontStyle: 'normal'
@@ -380,6 +439,12 @@ export const generateEnhancedPDF = ({ resume, language, country, type = 'resume'
         line.includes('github') || line.includes('+') || line.includes('http')
       );
 
+      const contactIcons = {
+        gmail: '✉',
+        phone: '☎',
+        linkedin: '💼',
+      };
+
       if (contactInfo.length > 0) {
         // Create contact row
         let contactY = y;
@@ -388,7 +453,15 @@ export const generateEnhancedPDF = ({ resume, language, country, type = 'resume'
 
         contactInfo.slice(0, 3).forEach((contact, index) => {
           const cleanContact = cleanText(contact);
-          addText(cleanContact, contactX, contactY, {
+          let icon = '';
+          if (cleanContact.includes('@')) {
+            icon = contactIcons.gmail;
+          } else if (cleanContact.includes('+') || cleanContact.includes('phone')) {
+            icon = contactIcons.phone;
+          } else if (cleanContact.includes('linkedin')) {
+            icon = contactIcons.linkedin;
+          }
+          addText(`${icon} ${cleanContact}`, contactX, contactY, {
             fontSize: 8,
             color: colors.light
           });
@@ -435,6 +508,7 @@ export const generateEnhancedPDF = ({ resume, language, country, type = 'resume'
       { keys: ['workexperience', 'experience', 'employment', 'career'], title: 'Work Experience' },
       { keys: ['education', 'educationcertifications', 'qualifications'], title: 'Education' },
       { keys: ['certifications', 'certificates'], title: 'Certifications' },
+      { keys: ['achievements', 'accomplishments'], title: 'Achievements' },
       { keys: ['additionalinformation', 'additional', 'other', 'projects'], title: 'Additional Information' }
     ];
 
@@ -466,20 +540,23 @@ export const generateEnhancedPDF = ({ resume, language, country, type = 'resume'
     // Remove footer - clean professional look
 
     // Smart file naming based on content and type
-    const { name, role } = extractNameAndRole(resume);
+const { name, role } = extractNameAndRole(resume, coverLetter);
     const countryCode = country.toLowerCase().replace(/[^a-z]/g, '').replace('international', '');
     const typeLabel = type === 'cover-letter' ? 'cover_letter' :
                      type === 'email' ? 'email' : 'resume';
     
-    const fileName = countryCode ?
+    let fileName = countryCode ?
       `${name}_${role}_${countryCode}_${typeLabel}.pdf` :
       `${name}_${role}_${typeLabel}.pdf`;
 
     pdf.save(fileName);
+    
+    return {
+      success: true,
+      fileName
+    };
   } catch (error) {
     console.error('Enhanced PDF generation error:', error);
     throw new Error('Failed to generate enhanced PDF');
-    return false;
   }
-  return true;
 };

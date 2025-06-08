@@ -79,9 +79,11 @@ const ResumeRenderer: React.FC<ResumeRendererProps> = ({ content, className = ""
       // Links [text](url)
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 underline font-medium">$1</a>')
       // Email addresses
-      .replace(/([\w\.-]+@[\w\.-]+\.\w+)/g, '<a href="mailto:$1" class="text-blue-600 hover:text-blue-800 underline font-medium">$1</a>')
+      .replace(/([\w\.-]+@[\w\.-]+\.\w+)/g, '<a href="mailto:$1" class="text-blue-600 hover:text-blue-800 underline font-medium"><MailIcon className="inline w-4 h-4 mr-1" />$1</a>')
       // Phone numbers
-      .replace(/(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/g, '<a href="tel:$1" class="text-blue-600 hover:text-blue-800 underline font-medium">$1</a>')
+      .replace(/(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/g, '<a href="tel:$1" class="text-blue-600 hover:text-blue-800 underline font-medium"><PhoneIcon className="inline w-4 h-4 mr-1" />$1</a>')
+      // LinkedIn profiles
+      .replace(/(https?:\/\/www\.linkedin\.com\/in\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline font-medium"><LinkedinIcon className="inline w-4 h-4 mr-1" />LinkedIn</a>')
       // URLs
       .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline font-medium">$1</a>');
 

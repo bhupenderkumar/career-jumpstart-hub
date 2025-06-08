@@ -14,13 +14,16 @@ import {
   CheckCircleIcon,
   BriefcaseIcon,
   EditIcon,
-  RefreshCwIcon
+  RefreshCwIcon,
+  LinkedinIcon,
+  PhoneIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
 import ResumeRenderer from "@/components/ResumeRenderer";
 import PDFPreview from "@/components/PDFPreview";
 import { generateUnifiedPDF } from "@/utils/unifiedPDFGenerator";
+import { generateEnhancedPDF } from "@/utils/enhancedPDFGenerator";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
 
 interface DocumentGeneratorProps {
@@ -152,6 +155,9 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
         type: 'resume'
       });
 
+      // Use the fileName from the result
+      const fileName = result.fileName;
+
       toast({
         title: "Resume Downloaded",
         description: "Professional PDF resume has been downloaded successfully!",
@@ -181,17 +187,15 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      generateEnhancedPDF({
-        resume: documents.coverLetter,
+      const result = generateEnhancedPDF({
+        coverLetter: documents.coverLetter,
         language,
         country,
         type: 'cover-letter'
       });
 
-      // Extract filename for display
-      const lines = documents.coverLetter.split('\n').map(line => line.trim()).filter(line => line);
-      const name = lines.length > 0 ? lines[0].replace(/\*\*/g, '').replace(/[^a-zA-Z\s]/g, '').trim().split(' ').slice(0, 2).join('_').toLowerCase() : 'cover_letter';
-      const fileName = `${name}_cover_letter.pdf`;
+      // Use the fileName from the result
+      const fileName = result.fileName;
 
       toast({
         title: "Cover Letter Downloaded",
@@ -382,10 +386,15 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                     >
                       Copy Text
                     </Button>
-                    <Badge className="bg-green-100 text-green-800">
-                      <CheckCircleIcon className="w-3 h-3 mr-1" />
-                      Professional Format
-                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadPDF}
+                      className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
+                    >
+                      <DownloadIcon className="w-3 h-3 mr-1" />
+                      PDF
+                    </Button>
                   </div>
                 </div>
                 <div className="border rounded-lg p-4 bg-white max-h-[600px] overflow-y-auto">
@@ -419,7 +428,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                       variant="outline"
                       size="sm"
                       onClick={handleDownloadCoverLetterPDF}
-                      className="border-green-300 text-green-700 hover:bg-green-50"
+                      className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
                     >
                       <DownloadIcon className="w-3 h-3 mr-1" />
                       PDF

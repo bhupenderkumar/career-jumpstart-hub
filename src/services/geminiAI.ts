@@ -166,6 +166,7 @@ ${formatInstructions}
 - If job mentions "Python" - add Python automation/data projects
 - KEEP existing company names but MODIFY project descriptions to match job requirements
 - Add realistic metrics and achievements for new projects (e.g., "improved performance by 40%", "reduced costs by $50K")
+- Add keywords specific as per the job description
 
 **ABSOLUTELY FORBIDDEN:**
 - NO square brackets like [Company Name] or [Add details]
@@ -210,6 +211,7 @@ ${formatInstructions}
 - KEEP existing company names but MODIFY project descriptions to include job-required technologies
 - Add realistic metrics: "improved performance by 35%", "reduced deployment time by 60%", "managed $200K budget"
 - Make existing experience sound more relevant by adding job-required technologies to project descriptions
+- Add keywords specific as per the job description
 
 **TECHNOLOGY ENHANCEMENT EXAMPLES:**
 - Job wants "Solana blockchain" → Add: "Developed DeFi protocol on Solana blockchain, handling 10K+ daily transactions"
@@ -255,6 +257,7 @@ ${formatInstructions}
 - Analyze job description and include ALL required technologies and skills
 - Create 2-3 realistic projects that directly use the technologies mentioned in the job
 - Add realistic company names and quantified achievements
+- Add keywords specific as per the job description
 
 **TECHNOLOGY MATCHING EXAMPLES:**
 - Job wants "Solana blockchain" → Create: "Developed DeFi lending protocol on Solana, processing $2M+ in transactions"
@@ -318,6 +321,7 @@ TARGET MARKET: ${country}
 - NEVER mention "Platform where job was advertised" or similar phrases
 - Use generic professional language that works for any company
 - Make it immediately ready to copy-paste and send to employers
+- Add keywords specific as per the job description
 
 **CONTENT STRUCTURE:**
 1. **Header**: Use realistic contact information from resume or create professional details
@@ -401,6 +405,7 @@ TARGET MARKET: ${country}
 - NEVER mention "Platform where job was advertised" or similar phrases
 - Use generic professional language that works for any company
 - Make it immediately ready to copy-paste and send
+- Add keywords specific as per the job description
 
 **EMAIL STRUCTURE:**
 1. **Subject Line**: Use format like "Application for [Role Type] Position" using actual role from job description

@@ -377,6 +377,12 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
         line.includes('github') || line.includes('+') || line.includes('http')
       );
 
+      const contactIcons = {
+        gmail: '✉',
+        phone: '☎',
+        linkedin: '💼',
+      };
+
       if (contactInfo.length > 0) {
         let contactY = y;
         let contactX = margin;
@@ -384,9 +390,19 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
 
         contactInfo.slice(0, 3).forEach((contact) => {
           const cleanContact = cleanText(contact);
-          addText(cleanContact, contactX, contactY, {
+          let icon = '';
+          if (cleanContact.includes('@')) {
+            icon = contactIcons.gmail;
+          } else if (cleanContact.includes('+') || cleanContact.includes('phone')) {
+            icon = contactIcons.phone;
+          } else if (cleanContact.includes('linkedin')) {
+            icon = contactIcons.linkedin;
+          }
+          addText(`${icon} ${cleanContact}`, contactX, contactY, {
             fontSize: 8,
-            color: colors.light
+            color: colors.light,
+            fontStyle: 'normal',
+            highlight: false
           });
           contactX += contactSpacing;
         });
@@ -399,7 +415,9 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
             const cleanContact = cleanText(contact);
             addText(cleanContact, contactX, contactY, {
               fontSize: 8,
-              color: colors.light
+              color: colors.light,
+              fontStyle: 'normal',
+              highlight: false
             });
             contactX += contactSpacing;
           });
@@ -518,18 +536,21 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
             fontStyle: 'normal',
             color: colors.secondary,
             lineHeight: 1.6,
-            maxWidth: maxWidth - 10
+            maxWidth: maxWidth - 10,
+            highlight: true
           } : type === 'email' ? {
             fontSize: 10.5,
             fontStyle: 'normal',
             color: colors.secondary,
             lineHeight: 1.5,
-            maxWidth: maxWidth - 8
+            maxWidth: maxWidth - 8,
+            highlight: true
           } : {
             fontSize: 10,
             fontStyle: 'normal',
             color: colors.secondary,
-            lineHeight: 1.4
+            lineHeight: 1.4,
+            highlight: true
           };
 
           yPos = addText(cleanItem, margin, yPos, textStyle);
@@ -544,8 +565,7 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
     const sectionMappings = type === 'cover-letter' ? [
       { keys: ['letterheader', 'header'], title: 'Letter Header' },
       { keys: ['greeting', 'salutation'], title: 'Greeting' },
-      { keys: ['opening', 'introduction'], title: 'Opening' },
-      { keys: ['body', 'content', 'main'], title: 'Letter Body' },
+      { keys: ['opening', 'introduction'], title: 'Letter Body' },
       { keys: ['closing', 'conclusion'], title: 'Closing' },
     ] : type === 'email' ? [
       { keys: ['subject', 'emailsubject'], title: 'Subject Line' },
