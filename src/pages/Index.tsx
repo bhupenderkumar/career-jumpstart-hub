@@ -17,6 +17,7 @@ import ContactInfoTest from "@/components/ContactInfoTest";
 import LanguageSelector from "@/components/LanguageSelector";
 import DocumentGenerator from "@/components/DocumentGenerator";
 import ApplicationManager from "@/components/ApplicationManager";
+import DownloadDemo from "@/components/DownloadDemo";
 import { generateResumeWithAI } from "@/services/geminiAI";
 import { getUserEnvVarAsync, setUserEnvVarAsync } from '../services/env';
 import { Settings2Icon } from 'lucide-react';
@@ -237,15 +238,15 @@ const Index = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <SparklesIcon className="w-5 h-5" />
-                  <span>Keyword Integration</span>
+                  <span>Smart Download Hub</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <SparklesIcon className="w-5 h-5" />
-                  <span>Professional Formatting</span>
+                  <span>ATS Score Analysis</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <SparklesIcon className="w-5 h-5" />
-                  <span>Instant PDF Export</span>
+                  <span>Professional PDF Export</span>
                 </div>
               </div>
             </div>
@@ -291,10 +292,14 @@ const Index = () => {
         {/* Main Content */}
         <main className="container mx-auto px-4 py-8">
           <Tabs defaultValue="generate" className="w-full">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-8">
               <TabsTrigger value="generate" className="flex items-center gap-2">
                 <FileTextIcon className="w-4 h-4" />
                 Generate Resume
+              </TabsTrigger>
+              <TabsTrigger value="download-demo" className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200">
+                <SparklesIcon className="w-4 h-4 text-blue-600" />
+                🎯 Download Hub
               </TabsTrigger>
               <TabsTrigger value="applications" className="flex items-center gap-2">
                 <BriefcaseIcon className="w-4 h-4" />
@@ -413,6 +418,11 @@ const Index = () => {
                   </div>
                 </div>
               </div>
+            </TabsContent>
+
+            {/* Download Demo Tab */}
+            <TabsContent value="download-demo" className="mt-6">
+              <DownloadDemo />
             </TabsContent>
 
             {/* Applications Tab */}

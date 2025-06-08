@@ -60,8 +60,7 @@ import {
   JobApplication
 } from "@/utils/jobScraper";
 import { generateResumeWithAI, generateAllDocuments } from "@/services/geminiAI";
-import { generateEnhancedPDF } from "@/utils/enhancedPDFGenerator";
-import { generateSimplePDF } from "@/utils/simplePDFGenerator";
+import { generateUnifiedPDF } from "@/utils/unifiedPDFGenerator";
 import { generateDocumentPDF } from "@/utils/documentPDFGenerator";
 import PDFPreview from "@/components/PDFPreview";
 import ResumeRenderer from "@/components/ResumeRenderer";
@@ -203,7 +202,7 @@ const EnhancedJobScraper = () => {
 
       setTotalCount(maxTotalCount);
       setHasNextPage(lastHasNextPage);
-      
+
       if (combinedJobs.length > 0) {
         toast({
           title: "Jobs Loaded",
@@ -231,11 +230,11 @@ const EnhancedJobScraper = () => {
 
     try {
       const result = await scrapeWeb3Jobs(nextPage, searchTerm);
-      
+
       // Remove duplicates when adding new jobs
       const allJobIds = new Set(allJobs.map(job => job.id));
       const uniqueNewJobs = result.jobs.filter(job => !allJobIds.has(job.id));
-      
+
       if (uniqueNewJobs.length > 0) {
         const newJobs = [...allJobs, ...uniqueNewJobs];
         setJobs(newJobs);
@@ -380,7 +379,7 @@ const EnhancedJobScraper = () => {
     }
 
     setFilteredJobs(filtered);
-    
+
     // Log filter results
     console.log(`Filtered jobs: ${filtered.length} of ${allJobs.length}`);
   };
@@ -499,29 +498,17 @@ ${contactInfo.location ? `   - Location: ${contactInfo.location}` : ''}
     if (!generatedResume || !selectedJob) return;
 
     try {
-      console.log('Starting professional PDF generation...');
+      console.log('Starting unified PDF generation for job application...');
 
-      // Try enhanced PDF first, fallback to simple PDF (same as main tab)
-      try {
-        generateEnhancedPDF({
-          resume: generatedResume,
-          language: "en",
-          country: "International"
-        });
-        console.log('Enhanced PDF generated successfully');
-      } catch (enhancedError) {
-        console.warn('Enhanced PDF failed, trying simple PDF:', enhancedError);
-        generateSimplePDF({
-          resume: generatedResume,
-          language: "en",
-          country: "International"
-        });
-        console.log('Simple PDF generated successfully');
-      }
+      const result = generateUnifiedPDF({
+        resume: generatedResume,
+        language: selectedLanguage,
+        country: selectedCountry
+      });
 
       toast({
         title: "Professional Resume Downloaded! 📄",
-        description: `Your AI-optimized resume for ${selectedJob.company} has been downloaded as PDF.`,
+        description: `Your tailored resume for ${selectedJob.company} has been downloaded as PDF.`,
       });
     } catch (error) {
       console.error('PDF generation failed:', error);
@@ -598,18 +585,18 @@ ${contactInfo.location ? `   - Location: ${contactInfo.location}` : ''}
   const handleGenerateResume = async (job: Job) => {
     const jobId = job.id;
     setGeneratingResume(prev => ({ ...prev, [jobId]: true }));
-    
+
     try {
       const tailoredResume = await generateTailoredResume(job, {});
-      
+
       toast({
         title: "Resume Generated",
         description: `Tailored resume created for ${job.title} at ${job.company}`,
       });
-      
+
       // Here you would typically save or display the resume
       console.log('Generated resume:', tailoredResume);
-      
+
     } catch (error) {
       toast({
         title: "Error",
@@ -624,15 +611,15 @@ ${contactInfo.location ? `   - Location: ${contactInfo.location}` : ''}
   const handleQuickApply = async (job: Job) => {
     const jobId = job.id;
     setApplying(prev => ({ ...prev, [jobId]: true }));
-    
+
     try {
       const success = await quickApply(job, "sample-resume", "sample-cover-letter");
-      
+
       if (success) {
         // Track the application
         const application = trackApplication(job, "latest");
         setApplications(prev => [...prev, application]);
-        
+
         toast({
           title: "Application Submitted",
           description: `Successfully applied to ${job.title} at ${job.company}`,
@@ -640,7 +627,7 @@ ${contactInfo.location ? `   - Location: ${contactInfo.location}` : ''}
       } else {
         throw new Error("Application failed");
       }
-      
+
     } catch (error) {
       toast({
         title: "Application Error",
@@ -998,7 +985,7 @@ Best regards,
               <CardTitle>Enhanced Job Search & Apply</CardTitle>
             </div>
             <div className="flex gap-2">
-              <Button 
+              <Button
                 onClick={() => loadJobs(true)}
                 disabled={isLoading}
                 variant="outline"
@@ -1417,7 +1404,7 @@ Best regards,
                           </Badge>
                         )}
                       </div>
-                      
+
                       <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300 mb-2">
                         <div className="flex items-center gap-1">
                           <BuildingIcon className="w-4 h-4" />
@@ -1442,7 +1429,7 @@ Best regards,
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="flex flex-wrap gap-1 mb-3">
                         {job.tags.map((tag, index) => (
                           <Badge key={index} variant="outline" className="text-xs">
@@ -1601,7 +1588,7 @@ Best regards,
                   Page {currentPage} of {Math.max(Math.ceil(totalCount / 10), 1)}
                 </Badge>
               </div>
-              
+
               {/* Progress Bar */}
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div
@@ -1691,7 +1678,7 @@ Best regards,
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="bg-green-100 text-green-800">
-                      ✅ ATS Optimized
+                      ✅ Professional Format
                     </Badge>
                     <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                       🎯 Job Tailored

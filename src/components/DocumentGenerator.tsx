@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
 import ResumeRenderer from "@/components/ResumeRenderer";
 import PDFPreview from "@/components/PDFPreview";
-import { generateEnhancedPDF } from "@/utils/enhancedPDFGenerator";
+import { generateUnifiedPDF } from "@/utils/unifiedPDFGenerator";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
 
 interface DocumentGeneratorProps {
@@ -145,17 +145,12 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      generateEnhancedPDF({
+      const result = generateUnifiedPDF({
         resume: documents.resume,
         language,
         country,
         type: 'resume'
       });
-
-      // Extract filename for display
-      const lines = documents.resume.split('\n').map(line => line.trim()).filter(line => line);
-      const name = lines.length > 0 ? lines[0].replace(/\*\*/g, '').replace(/[^a-zA-Z\s]/g, '').trim().split(' ').slice(0, 2).join('_').toLowerCase() : 'resume';
-      const fileName = `${name}_resume.pdf`;
 
       toast({
         title: "Resume Downloaded",
@@ -301,7 +296,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
             <BriefcaseIcon className="w-5 h-5 text-blue-600" />
             <CardTitle>Complete Application Package</CardTitle>
           </div>
-          <Button 
+          <Button
             onClick={handleGenerateAll}
             disabled={isGenerating || !jobDescription.trim()}
             className="bg-blue-600 hover:bg-blue-700"
@@ -380,8 +375,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Professional Resume</h3>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => copyToClipboard(documents.resume || '', 'Resume')}
                     >
@@ -389,7 +384,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                     </Button>
                     <Badge className="bg-green-100 text-green-800">
                       <CheckCircleIcon className="w-3 h-3 mr-1" />
-                      ATS Optimized
+                      Professional Format
                     </Badge>
                   </div>
                 </div>
@@ -448,8 +443,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Application Email Template</h3>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => copyToClipboard(documents.email || '', 'Email Template')}
                     >
@@ -478,7 +473,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
               Complete Application Package
             </h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              Generate a professional resume, cover letter, and email template all optimized 
+              Generate a professional resume, cover letter, and email template all optimized
               for your target job and market in one click.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">

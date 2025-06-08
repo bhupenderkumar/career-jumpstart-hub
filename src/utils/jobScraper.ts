@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getUserEnvVar } from '../services/env';
+import { getUserEnvVarAsync } from '../services/env';
 
 // Job interfaces - defining them here since types file doesn't exist yet
 export interface Job {
@@ -124,7 +124,7 @@ export async function scrapeWeb3Jobs(page: number = 1, searchTerm: string = 'jav
       result.jobs = result.jobs.map(enhanceJobWithContactInfo);
       return result;
     }
-    
+
     // If no results found, return empty result
     return {
       jobs: [],
@@ -166,7 +166,7 @@ function isJobFromLast24Hours(dateString: string): boolean {
     const now = new Date();
     const diffTime = now.getTime() - jobDate.getTime();
     const diffHours = diffTime / (1000 * 60 * 60);
-    
+
     return diffHours <= 24;
   } catch {
     // If date parsing fails, assume it's recent for better user experience
@@ -182,7 +182,7 @@ function formatDate(dateString: string): string {
     const diffTime = Math.abs(now.getTime() - date.getTime());
     const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffHours < 24) return `${diffHours}h`;
     if (diffDays === 1) return '1d';
     if (diffDays < 7) return `${diffDays}d`;
@@ -240,13 +240,13 @@ async function fetchFromRemoteOK(page: number, searchTerm: string = 'java'): Pro
       // Filter for Java-related jobs from last 24 hours
       const javaJobs = response.data.filter((job: any) => {
         if (!job || !job.position || !job.company) return false;
-        
+
         // Check if job is from last 24 hours
         if (job.date && !isJobFromLast24Hours(job.date)) return false;
-        
+
         const searchText = `${job.position} ${job.description || ''} ${(job.tags || []).join(' ')}`.toLowerCase();
         const javaKeywords = ['java', 'spring', 'spring boot', 'hibernate', 'maven', 'gradle', 'jvm', 'kotlin', 'scala', 'microservices', 'rest api', 'backend'];
-        
+
         return javaKeywords.some(keyword => searchText.includes(keyword));
       });
 
@@ -259,7 +259,7 @@ async function fetchFromRemoteOK(page: number, searchTerm: string = 'java'): Pro
         title: job.position || 'Java Developer',
         company: job.company || 'Tech Company',
         location: job.location || 'Remote',
-        salary: job.salary_min && job.salary_max 
+        salary: job.salary_min && job.salary_max
           ? `$${job.salary_min}k - $${job.salary_max}k`
           : 'Competitive',
         postedTime: formatDate(job.date) || 'Recently',
@@ -279,7 +279,7 @@ async function fetchFromRemoteOK(page: number, searchTerm: string = 'java'): Pro
     console.error('RemoteOK API error:', error);
     throw error;
   }
-  
+
   throw new Error('No jobs found from RemoteOK');
 }
 
@@ -304,7 +304,7 @@ async function fetchFromTheMuse(page: number, searchTerm: string = 'java'): Prom
         .filter((job: any) => {
           // Check if job is from last 24 hours
           if (job.publication_date && !isJobFromLast24Hours(job.publication_date)) return false;
-          
+
           const searchText = `${job.name} ${job.contents || ''} ${job.company?.name || ''}`.toLowerCase();
           const javaKeywords = ['java', 'spring', 'spring boot', 'hibernate', 'backend', 'microservices', 'rest api', 'jvm'];
           return javaKeywords.some(keyword => searchText.includes(keyword));
@@ -332,7 +332,7 @@ async function fetchFromTheMuse(page: number, searchTerm: string = 'java'): Prom
     console.error('The Muse API error:', error);
     throw error;
   }
-  
+
   throw new Error('No jobs found from The Muse');
 }
 
@@ -350,13 +350,13 @@ async function fetchFromArbeitnow(page: number, searchTerm: string = 'java'): Pr
       // Filter for Java-related jobs from last 24 hours
       const javaJobs = response.data.data.filter((job: any) => {
         if (!job || !job.title || !job.company_name) return false;
-        
+
         // Check if job is from last 24 hours
         if (job.created_at && !isJobFromLast24Hours(job.created_at)) return false;
-        
+
         const searchText = `${job.title} ${job.description || ''} ${(job.tags || []).join(' ')}`.toLowerCase();
         const javaKeywords = ['java', 'spring', 'spring boot', 'hibernate', 'backend', 'microservices', 'jvm', 'kotlin'];
-        
+
         return javaKeywords.some(keyword => searchText.includes(keyword));
       });
 
@@ -387,14 +387,14 @@ async function fetchFromArbeitnow(page: number, searchTerm: string = 'java'): Pr
     console.error('Arbeitnow API error:', error);
     throw error;
   }
-  
+
   throw new Error('No jobs found from Arbeitnow');
 }
 
 // Fetch jobs from JSearch API (LinkedIn alternative via RapidAPI)
 async function fetchFromJSearch(page: number, searchTerm: string = ''): Promise<JobScrapingResult> {
   try {
-    const rapidApiKey = getUserEnvVar('VITE_RAPIDAPI_KEY');
+    const rapidApiKey = await getUserEnvVarAsync('VITE_RAPIDAPI_KEY');
     if (!rapidApiKey) {
       console.warn('JSearch API key not configured');
       throw new Error('API key missing');
@@ -406,12 +406,12 @@ async function fetchFromJSearch(page: number, searchTerm: string = ''): Promise<
 
     // Process search term into clean words
     const searchWords = searchTerm.toLowerCase().trim().split(/\s+/);
-    
+
     // Construct optimized search query
     let query = searchTerm;
     const techTerms = ['javascript', 'python', 'java', 'react', 'node', 'angular', 'vue', 'developer', 'engineer'];
     const hasTechTerm = searchWords.some(word => techTerms.includes(word));
-    
+
     // Only add 'developer' if no tech-related terms are present
     if (!hasTechTerm && searchWords.length === 1) {
       query = `${searchWords[0]} developer`;
@@ -447,17 +447,17 @@ async function fetchFromJSearch(page: number, searchTerm: string = ''): Promise<
       const jobs: Job[] = response.data.data
         .filter((job: any) => {
           if (!job || !job.job_title || !job.employer_name) return false;
-          
+
           if (!job || !job.job_title || !job.employer_name) return false;
-          
+
           const jobText = `${job.job_title} ${job.job_description || ''} ${job.employer_name}`.toLowerCase();
           const searchTerms = searchWords.filter(word => word.length > 2); // Ignore very short words
-          
+
           // If only one search term, do a simple includes check
           if (searchTerms.length === 1) {
             return jobText.includes(searchTerms[0]);
           }
-          
+
           // For multiple search terms, require at least 50% of terms to match
           const matchCount = searchTerms.filter(word => jobText.includes(word)).length;
           return matchCount >= Math.ceil(searchTerms.length / 2);

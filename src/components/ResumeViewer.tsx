@@ -22,10 +22,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ResumeRenderer from "@/components/ResumeRenderer";
-import PDFPreview from "@/components/PDFPreview";
-import { generateEnhancedPDF } from "@/utils/enhancedPDFGenerator";
-import { generateSimplePDF } from "@/utils/simplePDFGenerator";
-import jsPDF from 'jspdf';
+import EnhancedDownloadHub from "@/components/EnhancedDownloadHub";
 
 interface ResumeViewerProps {
   resume: string;
@@ -65,8 +62,8 @@ const ResumeViewer: React.FC<ResumeViewerProps> = ({
 
   const analyzeOptimizations = () => {
     const optimizations = [
-      "Keywords from job description integrated",
-      "ATS-friendly formatting applied",
+      "Professional formatting applied",
+      "Experience consolidated by company",
       "Quantified achievements highlighted",
       "Relevant skills emphasized",
       "Professional summary tailored"
@@ -98,52 +95,7 @@ const ResumeViewer: React.FC<ResumeViewerProps> = ({
     return formattedSections;
   };
 
-  const handleExportPDF = () => {
-    if (!resume) {
-      toast({
-        title: "No Resume",
-        description: "Please generate a resume first before exporting.",
-        variant: "destructive",
-      });
-      return;
-    }
 
-    try {
-      console.log('Starting PDF generation...');
-      console.log('Resume length:', resume.length);
-      console.log('First 200 chars:', resume.substring(0, 200));
-
-      // Try enhanced PDF first, fallback to simple PDF
-      try {
-        generateEnhancedPDF({
-          resume,
-          language,
-          country
-        });
-        console.log('Enhanced PDF generated successfully');
-      } catch (enhancedError) {
-        console.warn('Enhanced PDF failed, trying simple PDF:', enhancedError);
-        generateSimplePDF({
-          resume,
-          language,
-          country
-        });
-        console.log('Simple PDF generated successfully');
-      }
-
-      toast({
-        title: "Professional Resume Downloaded",
-        description: `Your ${country} market-optimized resume has been downloaded as PDF.`,
-      });
-    } catch (error) {
-      console.error('PDF export error:', error);
-      toast({
-        title: "Export Error",
-        description: "Failed to export PDF. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleEdit = () => {
     setEditableResume(resume);
@@ -153,7 +105,7 @@ const ResumeViewer: React.FC<ResumeViewerProps> = ({
   const handleSave = () => {
     onResumeUpdate(editableResume);
     setIsEditing(false);
-    
+
     toast({
       title: "Resume Updated",
       description: "Your resume has been successfully updated.",
@@ -174,7 +126,7 @@ const ResumeViewer: React.FC<ResumeViewerProps> = ({
       });
       return;
     }
-    
+
     onRegenerateResume(editPrompt);
     setEditPrompt("");
     setShowEditPrompt(false);
@@ -217,7 +169,7 @@ const ResumeViewer: React.FC<ResumeViewerProps> = ({
               <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <TargetIcon className="w-4 h-4 text-green-600" />
-                  <span className="font-medium text-green-800">ATS Optimization Applied</span>
+                  <span className="font-medium text-green-800">Professional Optimization Applied</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {aiOptimizations.map((optimization, index) => (
@@ -258,9 +210,9 @@ const ResumeViewer: React.FC<ResumeViewerProps> = ({
                       <EyeIcon className="w-4 h-4" />
                       Professional View
                     </TabsTrigger>
-                    <TabsTrigger value="pdf" className="flex items-center gap-2">
-                      <FileTextIcon className="w-4 h-4" />
-                      PDF Preview
+                    <TabsTrigger value="download" className="flex items-center gap-2">
+                      <DownloadIcon className="w-4 h-4" />
+                      Download Hub
                     </TabsTrigger>
                     <TabsTrigger value="raw" className="flex items-center gap-2">
                       <FileTextIcon className="w-4 h-4" />
@@ -272,12 +224,12 @@ const ResumeViewer: React.FC<ResumeViewerProps> = ({
                     {renderFormattedResume()}
                   </TabsContent>
 
-                  <TabsContent value="pdf" className="mt-4">
-                    <PDFPreview
+                  <TabsContent value="download" className="mt-4">
+                    <EnhancedDownloadHub
                       resume={resume}
                       language={language}
                       country={country}
-                      onDownload={handleExportPDF}
+                      jobDescription={jobDescription}
                     />
                   </TabsContent>
 
@@ -327,10 +279,6 @@ const ResumeViewer: React.FC<ResumeViewerProps> = ({
                 <Separator />
 
                 <div className="flex gap-2 flex-wrap">
-                  <Button onClick={handleExportPDF} className="flex-1 bg-green-600 hover:bg-green-700">
-                    <DownloadIcon className="w-4 h-4 mr-2" />
-                    Download Professional PDF
-                  </Button>
                   <Button onClick={handleEdit} variant="outline" size="sm">
                     <EditIcon className="w-4 h-4 mr-2" />
                     Manual Edit
@@ -351,12 +299,12 @@ const ResumeViewer: React.FC<ResumeViewerProps> = ({
                 <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUpIcon className="w-5 h-5 text-green-600" />
-                    <span className="font-semibold text-green-800">Ready for ATS Systems</span>
+                    <span className="font-semibold text-green-800">Professional Resume Ready</span>
                   </div>
                   <p className="text-sm text-gray-700">
-                    This resume has been optimized with AI to pass through Applicant Tracking Systems (ATS)
-                    and increase your chances of getting shortlisted. Keywords from the job description have
-                    been strategically incorporated while maintaining natural readability.
+                    This resume has been professionally formatted and optimized with AI to showcase your
+                    experience and skills effectively. The content has been tailored to match industry
+                    standards while maintaining natural readability and professional presentation.
                   </p>
                 </div>
               </>
