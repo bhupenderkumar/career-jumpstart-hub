@@ -1,4 +1,4 @@
-import { getUserEnvVar } from '../services/env';
+import { getUserEnvVarAsync } from '../services/env';
 
 // Job API Configuration
 // This file contains configuration for various job APIs that provide real job listings
@@ -31,13 +31,13 @@ export const JOB_API_CONFIG = {
   // JSearch via RapidAPI - LinkedIn alternative
   jsearch: {
     baseUrl: 'https://jsearch.p.rapidapi.com/search',
-    enabled: !!getUserEnvVar('VITE_RAPIDAPI_KEY'),
+    enabled: async () => !!(await getUserEnvVarAsync('VITE_RAPIDAPI_KEY')),
     requiresAuth: true,
-    apiKey: getUserEnvVar('VITE_RAPIDAPI_KEY'),
-    headers: {
-      'X-RapidAPI-Key': getUserEnvVar('VITE_RAPIDAPI_KEY'),
+    apiKey: async () => await getUserEnvVarAsync('VITE_RAPIDAPI_KEY'),
+    headers: async () => ({
+      'X-RapidAPI-Key': await getUserEnvVarAsync('VITE_RAPIDAPI_KEY'),
       'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
-    },
+    }),
     description: 'LinkedIn alternative via RapidAPI - includes LinkedIn jobs'
   },
 
@@ -57,11 +57,12 @@ export const JOB_API_CONFIG = {
   // Adzuna - Job aggregator with free tier
   adzuna: {
     baseUrl: 'https://api.adzuna.com/v1/api/jobs/us/search',
-    enabled: !!(getUserEnvVar('VITE_ADZUNA_APP_ID') && getUserEnvVar('VITE_ADZUNA_APP_KEY')),
+    enabled: async () => !!(await getUserEnvVarAsync('VITE_ADZUNA_APP_ID') && await getUserEnvVarAsync('VITE_ADZUNA_APP_KEY')),
     requiresAuth: true,
-    appId: getUserEnvVar('VITE_ADZUNA_APP_ID'),
-    appKey: getUserEnvVar('VITE_ADZUNA_APP_KEY'),
-    description: 'Adzuna job aggregator with free tier - includes LinkedIn jobs'
+    appId: async () => await getUserEnvVarAsync('VITE_ADZUNA_APP_ID'),
+    appKey: async () => await getUserEnvVarAsync('VITE_ADZUNA_APP_KEY'),
+    headers: async () => ({}),
+    description: 'Adzuna jobs API'
   },
 
   // Indeed Jobs via RapidAPI

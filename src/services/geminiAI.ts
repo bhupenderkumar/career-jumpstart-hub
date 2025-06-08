@@ -1,9 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getUserEnvVar } from './env';
+import { getUserEnvVarAsync } from './env';
 
 // Initialize the Gemini AI client
-const getGeminiClient = () => {
-  const apiKey = getUserEnvVar('VITE_GEMINI_API_KEY');
+const getGeminiClient = async () => {
+  const apiKey = await getUserEnvVarAsync('VITE_GEMINI_API_KEY');
   
   if (!apiKey) {
     throw new Error('VITE_GEMINI_API_KEY is not configured. Please add your Gemini API key to the environment variables.');
@@ -57,7 +57,7 @@ export const generateAllDocuments = async ({
   generateType = 'all'
 }: ResumeGenerationRequest): Promise<GenerationResult> => {
   try {
-    const genAI = getGeminiClient();
+    const genAI = await getGeminiClient();
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // Get language-specific formatting and cultural guidelines
@@ -518,7 +518,7 @@ export const generateResumeOnly = async (params: ResumeGenerationRequest): Promi
 
 export const validateApiKey = async (): Promise<boolean> => {
   try {
-    const genAI = getGeminiClient();
+    const genAI = await getGeminiClient();
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     // Test with a simple prompt

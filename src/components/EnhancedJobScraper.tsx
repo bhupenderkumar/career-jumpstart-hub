@@ -65,7 +65,7 @@ import { generateSimplePDF } from "@/utils/simplePDFGenerator";
 import { generateDocumentPDF } from "@/utils/documentPDFGenerator";
 import PDFPreview from "@/components/PDFPreview";
 import ResumeRenderer from "@/components/ResumeRenderer";
-import { getUserEnvVar, setUserEnvVar } from '../services/env';
+import { getUserEnvVarAsync, setUserEnvVarAsync } from '../services/env';
 
 const EnhancedJobScraper = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -969,7 +969,7 @@ Best regards,
               className="w-full bg-blue-600 text-white rounded py-2 mt-2"
               onClick={() => {
                 if (envKeyInput && envValueInput) {
-                  setUserEnvVar(envKeyInput, envValueInput);
+                  setUserEnvVarAsync(envKeyInput, envValueInput);
                   setEnvKeyInput("");
                   setEnvValueInput("");
                   setShowEnvDialog(false);
