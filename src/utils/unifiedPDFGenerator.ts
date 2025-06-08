@@ -28,6 +28,10 @@ interface DownloadResult {
 
 // Extract name and role from resume for filename
 const extractNameAndRole = (resume: string): { name: string; role: string } => {
+  if (!resume) {
+    return { name: 'Resume', role: 'professional' };
+  }
+
   const lines = resume.split('\n').map(line => line.trim()).filter(line => line);
 
   // Extract name (usually first line, remove markdown)
