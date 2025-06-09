@@ -57,6 +57,8 @@ export const generateAllDocuments = async ({
   generateType = 'all'
 }: ResumeGenerationRequest): Promise<GenerationResult> => {
   try {
+    console.log('🌍 AI Service - Generating documents with language:', language, 'country:', country);
+
     const genAI = await getGeminiClient();
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
@@ -108,10 +110,17 @@ export const generateAllDocuments = async ({
     const formatInstructions = `
 **PDF FORMATTING:**
 1. **Contact Info:** Name (FULL NAME), Email (email@domain.com - clickable), Phone (+country-code-number - clickable), LinkedIn (linkedin.com/in/username - clickable), GitHub (github.com/username - clickable), Website (portfolio-website.com - clickable). Each item on a separate line.
-2. **Section Headers:** ALL CAPS (PROFESSIONAL SUMMARY, KEY SKILLS, etc.).
+2. **Section Headers:** ALL CAPS (${langGuidelines.sections}).
 3. **Tech Skills:** Group by category (Programming Languages, Frameworks, etc.). Format: "Category: Technology1, Technology2". Prioritize job-required skills.
 4. **ATS Optimization:** Action verbs, quantified achievements ("improved performance by 30%"), bold keywords, bullet points (•).
 5. **Professional Formatting:** Job titles ("Position | Company | Dates"), bullet points for achievements, concise descriptions, emphasize results.
+
+**LANGUAGE & CULTURAL GUIDELINES:**
+- **Format:** ${langGuidelines.format}
+- **Length:** ${langGuidelines.length}
+- **Style:** ${langGuidelines.style}
+- **Cultural Focus:** ${langGuidelines.cultural}
+- **Section Order:** ${langGuidelines.sections}
 `;
 
     let prompts: { [key: string]: string } = {};
@@ -124,6 +133,8 @@ You are an expert ATS resume writer. Create a FINAL, COMPLETE resume optimized f
 CURRENT RESUME: ${baseResume}
 ENHANCEMENT REQUEST: ${editPrompt}
 TARGET JOB: ${jobDescription}
+LANGUAGE: ${language.toUpperCase()} (Write the entire resume in ${language === 'en' ? 'English' : language === 'ja' ? 'Japanese' : language === 'es' ? 'Spanish' : language === 'fr' ? 'French' : language === 'de' ? 'German' : 'English'})
+MARKET: ${country}
 
 ${formatInstructions}
 
@@ -158,7 +169,8 @@ You are an expert resume writer. Create a FINAL, COMPLETE resume optimized for T
 
 ORIGINAL RESUME: ${baseResume}
 TARGET JOB: ${jobDescription}
-MARKET: ${country} (${language.toUpperCase()})
+LANGUAGE: ${language.toUpperCase()} (Write the entire resume in ${language === 'en' ? 'English' : language === 'ja' ? 'Japanese' : language === 'es' ? 'Spanish' : language === 'fr' ? 'French' : language === 'de' ? 'German' : 'English'})
+MARKET: ${country}
 
 ${formatInstructions}
 
@@ -196,7 +208,8 @@ IMPORTANT: Add realistic fake experience. No placeholder text.
 You are an expert resume writer. Create a FINAL, COMPLETE, PROFESSIONAL resume optimized for THIS JOB.
 
 TARGET JOB: ${jobDescription}
-MARKET: ${country} (${language.toUpperCase()})
+LANGUAGE: ${language.toUpperCase()} (Write the entire resume in ${language === 'en' ? 'English' : language === 'ja' ? 'Japanese' : language === 'es' ? 'Spanish' : language === 'fr' ? 'French' : language === 'de' ? 'German' : 'English'})
+MARKET: ${country}
 
 ${formatInstructions}
 
@@ -250,6 +263,7 @@ You are an expert cover letter writer. Create a FINAL, COMPLETE cover letter to 
 
 JOB: ${jobDescription}
 ${baseResume ? `CANDIDATE: ${baseResume}` : ''}
+LANGUAGE: ${language.toUpperCase()} (Write the entire cover letter in ${language === 'en' ? 'English' : language === 'ja' ? 'Japanese' : language === 'es' ? 'Spanish' : language === 'fr' ? 'French' : language === 'de' ? 'German' : 'English'})
 MARKET: ${country}
 
 **REQUIREMENTS - NO PLACEHOLDERS:**
@@ -305,6 +319,7 @@ You are an expert at writing job application emails. Create a FINAL, COMPLETE em
 
 JOB: ${jobDescription}
 ${baseResume ? `CANDIDATE: ${baseResume}` : ''}
+LANGUAGE: ${language.toUpperCase()} (Write the entire email in ${language === 'en' ? 'English' : language === 'ja' ? 'Japanese' : language === 'es' ? 'Spanish' : language === 'fr' ? 'French' : language === 'de' ? 'German' : 'English'})
 MARKET: ${country}
 
 **REQUIREMENTS - NO PLACEHOLDERS:**
@@ -412,7 +427,7 @@ export const validateApiKey = async (): Promise<boolean> => {
     
     // Test with a simple prompt
     const result = await model.generateContent("Hello");
-    const response = await result.response;
+    const response = result.response;
     const text = response.text();
     
     return text && text.length > 0;

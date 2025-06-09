@@ -16,15 +16,17 @@ import {
   EditIcon,
   RefreshCwIcon,
   LinkedinIcon,
-  PhoneIcon
+  PhoneIcon,
+  PrinterIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
 import ResumeRenderer from "@/components/ResumeRenderer";
 import PDFPreview from "@/components/PDFPreview";
 import { generateUnifiedPDF } from "@/utils/unifiedPDFGenerator";
-import { generateEnhancedPDF } from "@/utils/enhancedPDFGenerator";
+import { generateCleanPDF } from "@/utils/cleanPDFGenerator";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
+import { createCleanPrintWindow, formatResumeForPrint, formatDocumentForPrint } from "@/utils/printUtils";
 
 interface DocumentGeneratorProps {
   jobDescription: string;
@@ -60,6 +62,10 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
 
     setIsGenerating(true);
     try {
+      console.log('🌍 Generating documents with language:', language, 'country:', country);
+      console.log('📝 Job description length:', jobDescription.length);
+      console.log('📄 Base resume provided:', !!baseResume);
+
       const result = await generateAllDocuments({
         jobDescription,
         baseResume,
@@ -68,6 +74,9 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
         generateType: 'all'
       });
 
+      console.log('✅ Documents generated successfully for language:', language);
+      console.log('📊 Result keys:', Object.keys(result));
+
       setDocuments(result);
 
       // Save application to localStorage for tracking
@@ -75,7 +84,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
 
       toast({
         title: "Documents Generated Successfully",
-        description: "Resume, cover letter, and email template are ready!",
+        description: `Resume, cover letter, and email template are ready in ${language === 'en' ? 'English' : language === 'ja' ? 'Japanese' : language === 'es' ? 'Spanish' : language === 'fr' ? 'French' : language === 'de' ? 'German' : language} for ${country} market!`,
       });
     } catch (error) {
       console.error('Document generation error:', error);
@@ -148,24 +157,26 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      const result = generateUnifiedPDF({
-        resume: documents.resume,
-        language,
-        country,
+      const pdfBlob = generateCleanPDF({
+        content: documents.resume,
         type: 'resume'
       });
 
-      // Use the fileName from the result
-      const fileName = result.fileName;
+      // Generate a clean filename
+      const fileName = `resume_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      // Create download link
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
 
       toast({
         title: "Resume Downloaded",
-        description: "Professional PDF resume has been downloaded successfully!",
+        description: "Clean, professional PDF resume has been downloaded successfully!",
       });
-
-      // Show PWA install prompt after successful download
-      setDownloadInfo({ type: 'resume', fileName });
-      setShowPWAPrompt(true);
     } catch (error) {
       console.error('PDF generation error:', error);
       toast({
@@ -187,24 +198,26 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      const result = generateEnhancedPDF({
-        coverLetter: documents.coverLetter,
-        language,
-        country,
+      const pdfBlob = generateCleanPDF({
+        content: documents.coverLetter,
         type: 'cover-letter'
       });
 
-      // Use the fileName from the result
-      const fileName = result.fileName;
+      // Generate a clean filename
+      const fileName = `cover_letter_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      // Create download link
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
 
       toast({
         title: "Cover Letter Downloaded",
-        description: "Professional PDF cover letter has been downloaded successfully!",
+        description: "Clean, professional PDF cover letter has been downloaded successfully!",
       });
-
-      // Show PWA install prompt after successful download
-      setDownloadInfo({ type: 'cover-letter', fileName });
-      setShowPWAPrompt(true);
     } catch (error) {
       console.error('PDF generation error:', error);
       toast({
@@ -213,6 +226,179 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
         variant: "destructive",
       });
     }
+  };
+
+  const handlePrintDocument = (type: 'resume' | 'cover-letter' | 'email') => {
+    const content = type === 'resume' ? documents.resume :
+                   type === 'cover-letter' ? documents.coverLetter :
+                   documents.email;
+
+    if (!content) {
+      toast({
+        title: `No ${type.replace('-', ' ')}`,
+        description: "Please generate documents first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const documentTitle = type === 'resume' ? 'Resume' :
+                         type === 'cover-letter' ? 'Cover Letter' :
+                         'Email Template';
+
+    try {
+      // Format content based on document type
+      const formattedContent = type === 'resume'
+        ? formatResumeForPrint(content)
+        : formatDocumentForPrint(content, type);
+
+      // Use the clean print utility
+      createCleanPrintWindow({
+        title: documentTitle,
+        content: formattedContent,
+        documentType: type
+      });
+
+      toast({
+        title: "Print Dialog Opened",
+        description: `Your ${documentTitle.toLowerCase()} is ready to print with clean formatting!`,
+      });
+    } catch (error) {
+      toast({
+        title: "Print Error",
+        description: error instanceof Error ? error.message : "Failed to open print dialog. Please allow popups.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Format other documents (cover letter, email) for printing
+  const formatDocumentForPrint = (content: string, type: 'cover-letter' | 'email'): string => {
+    const lines = content.split('\n');
+    let html = '';
+
+    lines.forEach((line, index) => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) {
+        html += '<br>';
+        return;
+      }
+
+      // Apply basic formatting for cover letters and emails
+      if (type === 'cover-letter') {
+        // Format cover letter with proper spacing and structure
+        if (index === 0) {
+          html += `<div style="text-align: right; margin-bottom: 20px; font-size: 12px;">${trimmedLine}</div>`;
+        } else if (trimmedLine.toLowerCase().includes('dear') || trimmedLine.toLowerCase().includes('to whom')) {
+          html += `<div style="margin: 20px 0 10px 0; font-weight: bold;">${trimmedLine}</div>`;
+        } else if (trimmedLine.toLowerCase().includes('sincerely') || trimmedLine.toLowerCase().includes('regards')) {
+          html += `<div style="margin: 20px 0 10px 0;">${trimmedLine}</div>`;
+        } else {
+          html += `<div style="margin: 8px 0; line-height: 1.6; text-align: justify;">${trimmedLine}</div>`;
+        }
+      } else {
+        // Format email template
+        if (trimmedLine.toLowerCase().includes('subject:')) {
+          html += `<div style="font-weight: bold; margin: 10px 0; padding: 8px; background: #f0f0f0; border-left: 4px solid #2563eb;">${trimmedLine}</div>`;
+        } else if (trimmedLine.toLowerCase().includes('dear') || trimmedLine.toLowerCase().includes('to:')) {
+          html += `<div style="margin: 15px 0 10px 0; font-weight: bold;">${trimmedLine}</div>`;
+        } else {
+          html += `<div style="margin: 6px 0; line-height: 1.5;">${trimmedLine}</div>`;
+        }
+      }
+    });
+
+    return html;
+  };
+
+  // Format resume content for printing (similar to ResumeRenderer logic)
+  const formatResumeForPrint = (resumeText: string): string => {
+    const lines = resumeText.split('\n');
+    let html = '';
+
+    lines.forEach((line, index) => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) return;
+
+      // Apply keyword highlighting
+      const highlightedLine = highlightKeywordsForPrint(trimmedLine);
+
+      // Detect section headers (all caps or specific patterns)
+      if (trimmedLine.match(/^[A-Z\s&]+$/) && trimmedLine.length > 3) {
+        html += `<div class="section-header">${highlightedLine}</div>`;
+      }
+      // Detect subsection headers (Title Case with | separators)
+      else if (trimmedLine.match(/^[A-Z][a-zA-Z\s]+\s*\|\s*[A-Z][a-zA-Z\s]+/)) {
+        html += `<div class="subsection-header">${highlightedLine}</div>`;
+      }
+      // Detect bullet points
+      else if (trimmedLine.match(/^[•·\-\*]\s/)) {
+        const bulletContent = trimmedLine.replace(/^[•·\-\*]\s/, '');
+        html += `<div class="bullet">${highlightKeywordsForPrint(bulletContent)}</div>`;
+      }
+      // Detect contact info
+      else if (trimmedLine.match(/@|phone:|email:|linkedin:|github:/i)) {
+        html += `<span class="contact">${highlightedLine}</span>`;
+      }
+      // Check if it's a name (first line, likely all caps or title case)
+      else if (index === 0 && trimmedLine.match(/^[A-Z\s]+$/)) {
+        html += `<div class="name">${trimmedLine}</div><div class="name-underline"></div>`;
+      }
+      // Check if it's a title/role (second line, often contains job titles)
+      else if (index === 1 && trimmedLine.match(/engineer|developer|manager|analyst|specialist|coordinator|director|consultant/i)) {
+        html += `<div class="title">${highlightedLine}</div>`;
+      }
+      // Regular content
+      else {
+        html += `<div class="text">${highlightedLine}</div>`;
+      }
+    });
+
+    return html;
+  };
+
+  // Highlight keywords for print (matching ResumeRenderer logic)
+  const highlightKeywordsForPrint = (text: string): string => {
+    const keyTechnologies = [
+      'java', 'spring', 'boot', 'microservices', 'rest', 'api', 'mongodb', 'postgresql',
+      'mysql', 'aws', 'docker', 'kubernetes', 'react', 'javascript', 'typescript',
+      'python', 'node', 'angular', 'vue', 'git', 'jenkins', 'ci/cd', 'agile', 'scrum',
+      'html', 'css', 'sass', 'webpack', 'redux', 'graphql', 'firebase', 'azure',
+      'spring boot', 'hibernate', 'maven', 'gradle', 'jvm', 'kotlin', 'scala'
+    ];
+
+    const professionalKeywords = [
+      'experience', 'years', 'developed', 'implemented', 'managed', 'led', 'built',
+      'designed', 'optimized', 'improved', 'achieved', 'delivered', 'collaborated',
+      'scalable', 'performance', 'architecture', 'team', 'project', 'solution',
+      'responsible', 'maintained', 'created', 'established', 'coordinated',
+      'senior', 'lead', 'principal', 'director', 'manager'
+    ];
+
+    let formattedText = text;
+
+    // Highlight technical keywords
+    keyTechnologies.forEach(tech => {
+      const regex = new RegExp(`\\b${tech.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+      formattedText = formattedText.replace(regex, (match) =>
+        `<span class="keyword-tech">${match}</span>`
+      );
+    });
+
+    // Highlight professional keywords
+    professionalKeywords.forEach(keyword => {
+      const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+      formattedText = formattedText.replace(regex, (match) =>
+        `<span class="keyword-prof">${match}</span>`
+      );
+    });
+
+    // Highlight numbers and metrics
+    formattedText = formattedText.replace(/\b(\d+(?:\.\d+)?(?:%|\+|k|K|M|years?|months?|\$))\b/g,
+      '<span class="keyword-metric">$1</span>'
+    );
+
+    return formattedText;
   };
 
   const copyToClipboard = (text: string, type: string) => {
@@ -309,9 +495,19 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
             {isGenerating ? "Generating..." : "Generate All Documents"}
           </Button>
         </div>
-        <CardDescription>
-          Generate resume, cover letter, and email template optimized for {country} market
-        </CardDescription>
+        <div className="space-y-2">
+          <CardDescription>
+            Generate resume, cover letter, and email template optimized for {country} market
+          </CardDescription>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs px-2 py-0.5">
+              {language === 'en' ? 'English' : language === 'ja' ? 'Japanese' : language === 'es' ? 'Spanish' : language === 'fr' ? 'French' : language === 'de' ? 'German' : language}
+            </Badge>
+            <Badge variant="outline" className="text-xs px-2 py-0.5">
+              {country}
+            </Badge>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         {/* Enhancement Section */}
@@ -389,6 +585,15 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => handlePrintDocument('resume')}
+                      className="border-blue-300 text-blue-700 hover:bg-blue-50 flex items-center"
+                    >
+                      <PrinterIcon className="w-3 h-3 mr-1" />
+                      Print
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={handleDownloadPDF}
                       className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
                     >
@@ -427,6 +632,15 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => handlePrintDocument('cover-letter')}
+                      className="border-blue-300 text-blue-700 hover:bg-blue-50 flex items-center"
+                    >
+                      <PrinterIcon className="w-3 h-3 mr-1" />
+                      Print
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={handleDownloadCoverLetterPDF}
                       className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
                     >
@@ -458,6 +672,15 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                       onClick={() => copyToClipboard(documents.email || '', 'Email Template')}
                     >
                       Copy Email
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePrintDocument('email')}
+                      className="border-blue-300 text-blue-700 hover:bg-blue-50 flex items-center"
+                    >
+                      <PrinterIcon className="w-3 h-3 mr-1" />
+                      Print
                     </Button>
                     <Badge className="bg-purple-100 text-purple-800">
                       <CheckCircleIcon className="w-3 h-3 mr-1" />

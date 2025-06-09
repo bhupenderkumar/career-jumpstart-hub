@@ -18,7 +18,7 @@ import {
   ShieldCheckIcon,
   AwardIcon
 } from "lucide-react";
-import { generateUnifiedPDF } from "@/utils/unifiedPDFGenerator";
+import { generateEnhancedPDF } from "@/utils/enhancedPDFGenerator";
 import { useToast } from "@/hooks/use-toast";
 
 interface EnhancedDownloadHubProps {
@@ -149,18 +149,19 @@ const EnhancedDownloadHub: React.FC<EnhancedDownloadHubProps> = ({
       }, 200);
 
       if (format === 'pdf') {
-        const result = generateUnifiedPDF({
-          resume,
+        const result = generateEnhancedPDF({
+          document: resume,
           language,
-          country
+          country,
+          type: 'resume'
         });
         
         setDownloadProgress(100);
         
-        toast({
-          title: "🎉 Resume Downloaded Successfully!",
-          description: `Your ATS-optimized resume (Score: ${atsScore?.overall}%) is ready!`,
-        });
+        // toast({
+        //   title: "🎉 Resume Downloaded Successfully!",
+        //   description: `Your ATS-optimized resume (Score: ${atsScore?.overall}%) is ready!`,
+        // });
       } else {
         // Text download
         const element = document.createElement("a");

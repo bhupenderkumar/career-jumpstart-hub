@@ -1,32 +1,9 @@
 import jsPDF from 'jspdf';
 
-interface EnhancedPDFOptions {
-  document?: string;
-  language: string;
-  country: string;
-  type?: 'resume' | 'cover-letter' | 'email';
-  customization?: {
-    fontSize?: number;
-    fontFamily?: string;
-    colorScheme?: 'professional' | 'modern' | 'creative';
-    includeWatermark?: boolean;
-    includeMetadata?: boolean;
-    atsOptimized?: boolean;
-  };
-}
-
-interface DownloadResult {
-  success: boolean;
-  fileName: string;
-  fileSize?: number;
-  downloadTime?: number;
-  metadata?: {
-    generatedAt: string;
-    version: string;
-    optimizations?: string[];
-    atsScore?: string;
-    designLevel?: string;
-  };
+export interface CleanPDFOptions {
+  content: string;
+  type: 'resume' | 'cover-letter' | 'email';
+  fileName?: string;
 }
 
 interface ParsedSection {
@@ -35,120 +12,107 @@ interface ParsedSection {
   level?: number;
 }
 
-// Colors matching ResumeRenderer exactly
-const colors = {
-  // Primary colors
-  black: [0, 0, 0],
-  darkGray: [55, 65, 81],        // text-gray-700
-  mediumGray: [107, 114, 128],   // text-gray-500
-  lightGray: [156, 163, 175],    // text-gray-400
-
-  // Brand colors (matching gradient)
-  blueStart: [37, 99, 235],      // blue-600
-  blueMid: [147, 51, 234],       // purple-600
-  blueEnd: [30, 64, 175],        // blue-800
-
-  // Keyword highlighting colors (matching ResumeRenderer)
-  techBg: [219, 234, 254],       // bg-blue-100
-  techText: [30, 64, 175],       // text-blue-800
-
-  profBg: [220, 252, 231],       // bg-green-100
-  profText: [22, 101, 52],       // text-green-800
-
-  metricBg: [254, 215, 170],     // bg-orange-100
-  metricText: [154, 52, 18],     // text-orange-800
-
-  // Section styling
-  sectionBg: [249, 250, 251],    // bg-gray-50
-  sectionBorder: [59, 130, 246], // border-blue-500
-
-  // Contact styling
-  contactBg: [239, 246, 255],    // bg-blue-50
-  contactText: [29, 78, 216],    // text-blue-700
-  contactBorder: [191, 219, 254] // border-blue-200
-};
-
-// Keywords matching ResumeRenderer exactly
-const keyTechnologies = [
-  'java', 'spring', 'boot', 'microservices', 'rest', 'api', 'mongodb', 'postgresql',
-  'mysql', 'aws', 'docker', 'kubernetes', 'react', 'javascript', 'typescript',
-  'python', 'node', 'angular', 'vue', 'git', 'jenkins', 'ci/cd', 'agile', 'scrum',
-  'html', 'css', 'sass', 'webpack', 'redux', 'graphql', 'firebase', 'azure',
-  'spring boot', 'hibernate', 'maven', 'gradle', 'jvm', 'kotlin', 'scala'
-];
-
-const professionalKeywords = [
-  'experience', 'years', 'developed', 'implemented', 'managed', 'led', 'built',
-  'designed', 'optimized', 'improved', 'achieved', 'delivered', 'collaborated',
-  'scalable', 'performance', 'architecture', 'team', 'project', 'solution',
-  'responsible', 'maintained', 'created', 'established', 'coordinated',
-  'senior', 'lead', 'principal', 'director', 'manager'
-];
-
-// Parse resume content exactly like ResumeRenderer
-const parseResumeContent = (text: string): ParsedSection[] => {
-  if (!text) return [];
-
-  const lines = text.split('\n');
-  const sections: ParsedSection[] = [];
-
-  lines.forEach((line, index) => {
-    const trimmedLine = line.trim();
-    if (!trimmedLine) return;
-
-    // Detect section headers (all caps or specific patterns) - matching ResumeRenderer
-    if (trimmedLine.match(/^[A-Z\s&]+$/) && trimmedLine.length > 3) {
-      sections.push({ type: 'section-header', content: trimmedLine });
-    }
-    // Detect subsection headers (Title Case with | separators) - matching ResumeRenderer
-    else if (trimmedLine.match(/^[A-Z][a-zA-Z\s]+\s*\|\s*[A-Z][a-zA-Z\s]+/)) {
-      sections.push({ type: 'subsection-header', content: trimmedLine });
-    }
-    // Detect bullet points - matching ResumeRenderer
-    else if (trimmedLine.match(/^[•·\-\*]\s/)) {
-      sections.push({ type: 'bullet', content: trimmedLine.replace(/^[•·\-\*]\s/, '') });
-    }
-    // Detect contact info (email, phone, etc.) - matching ResumeRenderer
-    else if (trimmedLine.match(/@|phone:|email:|linkedin:|github:/i)) {
-      sections.push({ type: 'contact', content: trimmedLine });
-    }
-    // Check if it's a name (first line, likely all caps or title case) - matching ResumeRenderer
-    else if (index === 0 && trimmedLine.match(/^[A-Z\s]+$/)) {
-      sections.push({ type: 'name', content: trimmedLine });
-    }
-    // Check if it's a title/role (second line, often contains job titles) - matching ResumeRenderer
-    else if (index === 1 && trimmedLine.match(/engineer|developer|manager|analyst|specialist|coordinator|director|consultant/i)) {
-      sections.push({ type: 'title', content: trimmedLine });
-    }
-    // Regular content
-    else {
-      sections.push({ type: 'text', content: trimmedLine });
-    }
-  });
-
-  return sections;
-};
-
-export const generateEnhancedPDF = ({
-  document,
-  language,
-  country,
-  type = 'resume',
-  customization = {}
-}: EnhancedPDFOptions): DownloadResult => {
-  console.log(`📄 Generating ${type} for ${country} market in ${language}`);
-  console.log('🎨 Applying customization:', customization);
-
-  if (!document || document.trim().length === 0) {
-    throw new Error(`${type} content is empty or invalid`);
-  }
-
+export const generateCleanPDF = ({ content, type, fileName }: CleanPDFOptions): Blob => {
   const pdf = new jsPDF();
-  const pageWidth = pdf.internal.pageSize.width;
-  const pageHeight = pdf.internal.pageSize.height;
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 20;
   const maxWidth = pageWidth - (margin * 2);
   let y = margin;
+
+  // Colors matching ResumeRenderer exactly
+  const colors = {
+    // Primary colors
+    black: [0, 0, 0],
+    darkGray: [55, 65, 81],        // text-gray-700
+    mediumGray: [107, 114, 128],   // text-gray-500
+    lightGray: [156, 163, 175],    // text-gray-400
+
+    // Brand colors (matching gradient)
+    blueStart: [37, 99, 235],      // blue-600
+    blueMid: [147, 51, 234],       // purple-600
+    blueEnd: [30, 64, 175],        // blue-800
+
+    // Keyword highlighting colors (matching ResumeRenderer)
+    techBg: [219, 234, 254],       // bg-blue-100
+    techText: [30, 64, 175],       // text-blue-800
+
+    profBg: [220, 252, 231],       // bg-green-100
+    profText: [22, 101, 52],       // text-green-800
+
+    metricBg: [254, 215, 170],     // bg-orange-100
+    metricText: [154, 52, 18],     // text-orange-800
+
+    // Section styling
+    sectionBg: [249, 250, 251],    // bg-gray-50
+    sectionBorder: [59, 130, 246], // border-blue-500
+
+    // Contact styling
+    contactBg: [239, 246, 255],    // bg-blue-50
+    contactText: [29, 78, 216],    // text-blue-700
+    contactBorder: [191, 219, 254] // border-blue-200
+  };
+
+  // Keywords matching ResumeRenderer exactly
+  const keyTechnologies = [
+    'java', 'spring', 'boot', 'microservices', 'rest', 'api', 'mongodb', 'postgresql',
+    'mysql', 'aws', 'docker', 'kubernetes', 'react', 'javascript', 'typescript',
+    'python', 'node', 'angular', 'vue', 'git', 'jenkins', 'ci/cd', 'agile', 'scrum',
+    'html', 'css', 'sass', 'webpack', 'redux', 'graphql', 'firebase', 'azure',
+    'spring boot', 'hibernate', 'maven', 'gradle', 'jvm', 'kotlin', 'scala'
+  ];
+
+  const professionalKeywords = [
+    'experience', 'years', 'developed', 'implemented', 'managed', 'led', 'built',
+    'designed', 'optimized', 'improved', 'achieved', 'delivered', 'collaborated',
+    'scalable', 'performance', 'architecture', 'team', 'project', 'solution',
+    'responsible', 'maintained', 'created', 'established', 'coordinated',
+    'senior', 'lead', 'principal', 'director', 'manager'
+  ];
+
+  // Parse resume content exactly like ResumeRenderer
+  const parseResumeContent = (text: string): ParsedSection[] => {
+    if (!text) return [];
+
+    const lines = text.split('\n');
+    const sections: ParsedSection[] = [];
+
+    lines.forEach((line, index) => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) return;
+
+      // Detect section headers (all caps or specific patterns) - matching ResumeRenderer
+      if (trimmedLine.match(/^[A-Z\s&]+$/) && trimmedLine.length > 3) {
+        sections.push({ type: 'section-header', content: trimmedLine });
+      }
+      // Detect subsection headers (Title Case with | separators) - matching ResumeRenderer
+      else if (trimmedLine.match(/^[A-Z][a-zA-Z\s]+\s*\|\s*[A-Z][a-zA-Z\s]+/)) {
+        sections.push({ type: 'subsection-header', content: trimmedLine });
+      }
+      // Detect bullet points - matching ResumeRenderer
+      else if (trimmedLine.match(/^[•·\-\*]\s/)) {
+        sections.push({ type: 'bullet', content: trimmedLine.replace(/^[•·\-\*]\s/, '') });
+      }
+      // Detect contact info (email, phone, etc.) - matching ResumeRenderer
+      else if (trimmedLine.match(/@|phone:|email:|linkedin:|github:/i)) {
+        sections.push({ type: 'contact', content: trimmedLine });
+      }
+      // Check if it's a name (first line, likely all caps or title case) - matching ResumeRenderer
+      else if (index === 0 && trimmedLine.match(/^[A-Z\s]+$/)) {
+        sections.push({ type: 'name', content: trimmedLine });
+      }
+      // Check if it's a title/role (second line, often contains job titles) - matching ResumeRenderer
+      else if (index === 1 && trimmedLine.match(/engineer|developer|manager|analyst|specialist|coordinator|director|consultant/i)) {
+        sections.push({ type: 'title', content: trimmedLine });
+      }
+      // Regular content
+      else {
+        sections.push({ type: 'text', content: trimmedLine });
+      }
+    });
+
+    return sections;
+  };
 
   // Clean text function matching ResumeRenderer
   const cleanText = (text: string): string => {
@@ -401,62 +365,17 @@ export const generateEnhancedPDF = ({
 
   try {
     // Parse document using ResumeRenderer logic
-    const sections = parseResumeContent(document);
+    const sections = parseResumeContent(content);
 
     // Render all sections
     sections.forEach((section, index) => {
       y = renderSection(section, index);
     });
 
-    // Add footer with metadata
-    const addFooter = () => {
-      const pageCount = pdf.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        pdf.setPage(i);
-        pdf.setFontSize(8);
-        pdf.setTextColor(colors.lightGray[0], colors.lightGray[1], colors.lightGray[2]);
+    return pdf.output('blob');
 
-        // Page numbers
-        pdf.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 20, pageHeight - 10);
-
-        // ATS optimization indicator
-        if (customization.atsOptimized) {
-          pdf.text('ATS-Optimized Format', margin, pageHeight - 10);
-        }
-      }
-    };
-
-    addFooter();
-
-    // Generate filename
-    const timestamp = new Date().toISOString().split('T')[0];
-    const fileName = `${type}_${language}_${country}_${timestamp}.pdf`;
-
-    // Save PDF
-    pdf.save(fileName);
-
-    console.log(`✅ Successfully generated ${fileName}`);
-
-    return {
-      success: true,
-      fileName,
-      downloadTime: Date.now(),
-      metadata: {
-        generatedAt: new Date().toISOString(),
-        version: '2.0',
-        optimizations: [
-          'ATS-friendly formatting',
-          'Keyword highlighting',
-          'Consistent structure',
-          'Language optimization',
-          'Regional formatting'
-        ],
-        atsScore: customization.atsOptimized ? '98% ATS Compatibility' : 'Standard Format',
-        designLevel: customization.colorScheme || 'Professional'
-      }
-    };
   } catch (error) {
-    console.error('PDF generation error:', error);
-    throw new Error(`Failed to generate ${type} PDF: ${error.message}`);
+    console.error('Error generating clean PDF:', error);
+    throw new Error('Failed to generate PDF');
   }
 };

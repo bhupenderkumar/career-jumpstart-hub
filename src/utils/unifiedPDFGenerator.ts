@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 
 interface UnifiedPDFOptions {
-  resume: string;
+  document: string;
   language: string;
   country: string;
   type?: 'resume' | 'cover-letter' | 'email';
@@ -27,12 +27,12 @@ interface DownloadResult {
 }
 
 // Extract name and role from resume for filename
-const extractNameAndRole = (resume: string): { name: string; role: string } => {
-  if (!resume) {
+const extractNameAndRole = (document: string): { name: string; role: string } => {
+  if (!document) {
     return { name: 'Resume', role: 'professional' };
   }
 
-  const lines = resume.split('\n').map(line => line.trim()).filter(line => line);
+  const lines = document.split('\n').map(line => line.trim()).filter(line => line);
 
   // Extract name (usually first line, remove markdown)
   let name = 'Resume';
@@ -56,7 +56,7 @@ const extractNameAndRole = (resume: string): { name: string; role: string } => {
     'data', 'machine learning', 'ai', 'blockchain', 'cloud'
   ];
 
-  const resumeText = resume.toLowerCase();
+  const resumeText = document.toLowerCase();
   for (const keyword of roleKeywords) {
     if (resumeText.includes(keyword)) {
       role = keyword.replace(/\s+/g, '_');
@@ -67,9 +67,63 @@ const extractNameAndRole = (resume: string): { name: string; role: string } => {
   return { name: name || 'resume', role };
 };
 
-// Professional formatting helper functions
+// Function to append personal projects section if it doesn't exist
+const appendPersonalProjects = (resumeText: string): string => {
+  // Check if the resume already has a personal projects section
+  if (resumeText.includes('PERSONAL PROJECTS') || resumeText.includes('PROJECTS')) {
+    return resumeText; // Already has projects section
+  }
+  
+  // Personal projects HTML content provided by the user
+  const personalProjectsContent = `
+PERSONAL PROJECTS
 
-export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' }: UnifiedPDFOptions) => {
+• Agentia Creator | AI • TypeScript • Java
+  Innovative AI-powered content creation platform with Java Spring Boot backend and TypeScript frontend. Features intelligent content generation, user management, and scalable microservices architecture.
+  Tech: Java 11, Spring Boot, TypeScript, PostgreSQL, Redis, Docker
+  GitHub: https://github.com/bhupenderkumar/agentia-creator
+
+• AI System Design Backend | AI • Backend • TypeScript
+  Comprehensive backend system for AI-driven system design tools. Built with modern TypeScript and Java integration, featuring real-time processing, algorithm optimization, and scalable architecture.
+  Tech: TypeScript, Java, Spring Boot, Machine Learning APIs, AWS
+  GitHub: https://github.com/bhupenderkumar/aisystemdesignbackend
+
+• Building Helper | Construction • Java • Web
+  Complete construction management platform helping customers streamline their building projects. Java-based backend with comprehensive project management, cost estimation, and contractor coordination features.
+  Tech: Java 8, Spring Boot, MySQL, Angular, REST APIs, Maven
+  GitHub: https://github.com/bhupenderkumar/buildinghelper
+
+• CryptoPatch | Crypto • JavaScript • Security
+  Advanced cryptocurrency security and patching tool built with JavaScript and Java backend integration. Features vulnerability scanning, security patches, and blockchain transaction monitoring.
+  Tech: JavaScript, Java, Spring Security, Blockchain APIs, MongoDB
+  GitHub: https://github.com/bhupenderkumar/CryptoPatch
+
+• CryptoPrice Tracker | Fintech • Java • APIs
+  Real-time cryptocurrency price tracking application with Java backend. Features live price feeds, portfolio management, alerts system, and comprehensive market analysis tools.
+  Tech: Java 11, Spring Boot, External APIs, WebSocket, PostgreSQL
+  GitHub: https://github.com/bhupenderkumar/CryptoPrice
+
+• Edu Connect Gateway | Education • TypeScript • Gateway
+  Educational platform API gateway built with TypeScript and Java microservices. Provides secure authentication, course management, student tracking, and integrated learning management system.
+  Tech: TypeScript, Java, Spring Cloud Gateway, OAuth2, Microservices
+  GitHub: https://github.com/bhupenderkumar/edu-connect-gateway
+`;
+
+  return resumeText + '\n\n' + personalProjectsContent;
+};
+
+// Professional formatting helper functions
+export const generateUnifiedPDF = ({ document, language, country, type = 'resume' }: UnifiedPDFOptions): DownloadResult => {
+  if (!document || document.trim().length === 0) {
+    throw new Error(`${type} content is empty or invalid`);
+  }
+
+  // Enhance content based on document type
+  let enhancedContent = document;
+  if (type === 'resume') {
+    enhancedContent = appendPersonalProjects(document);
+  }
+
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;
@@ -156,7 +210,7 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
     });
   };
 
-  // Enhanced text helper with highlighting and page breaks
+  // Add text helper with highlighting and page breaks
   const addText = (text: string, x: number, yPos: number, options: any = {}): number => {
     const {
       fontSize = 9,
@@ -242,130 +296,31 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
     pdf.line(x1, y1, x2, y2);
   };
 
-  // Add background helper
-  const addBackground = (x: number, y: number, width: number, height: number, color = colors.background): void => {
-    pdf.setFillColor(color[0], color[1], color[2]);
-    pdf.rect(x, y, width, height, 'F');
-  };
-
   try {
+    // Parse document content
+    const lines = enhancedContent.split('\n').map(line => line.trim()).filter(line => line);
 
-    // Parse resume content with experience consolidation
-    const parseResume = (text: string) => {
-      const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-      const sections: { [key: string]: string[] } = {};
-      let currentSection = 'header';
-      let headerInfo: string[] = [];
-      let headerComplete = false;
-      let experienceEntries: any[] = [];
-
-      lines.forEach((line, index) => {
-        // Detect section headers (all caps, common section names)
-        const isSection = line.match(/^[A-Z\s&]+$/) && line.length > 3 && (
-          line.includes('PROFESSIONAL') || line.includes('SUMMARY') ||
-          line.includes('SKILLS') || line.includes('EXPERIENCE') ||
-          line.includes('EDUCATION') || line.includes('WORK') ||
-          line.includes('ADDITIONAL') || line.includes('CERTIFICATIONS') ||
-          line.includes('PROJECTS') || line.includes('LANGUAGES')
-        );
-
-        if (isSection) {
-          headerComplete = true;
-          currentSection = line.toLowerCase().replace(/[^a-z]/g, '');
-          sections[currentSection] = [];
-        } else if (!headerComplete && index < 8) {
-          headerInfo.push(line);
-        } else {
-          if (!sections[currentSection]) {
-            sections[currentSection] = [];
-          }
-          if (line.length > 0) {
-            sections[currentSection].push(line);
-          }
-        }
-      });
-
-      // Process experience section to consolidate by company and extract dates
-      if (sections['workexperience'] || sections['experience']) {
-        const expSection = sections['workexperience'] || sections['experience'];
-        const consolidatedExp: string[] = [];
-        let currentCompany = '';
-        let currentRole = '';
-        let startDate = '';
-        let endDate = '';
-        let responsibilities: string[] = [];
-
-        expSection.forEach(line => {
-          // Check if line contains job title and company (format: "Title | Company | Dates")
-          if (line.includes('|')) {
-            // Save previous entry if exists
-            if (currentCompany && currentRole) {
-              const dateRange = startDate && endDate ? ` (${startDate} - ${endDate})` : '';
-              consolidatedExp.push(`${currentRole} | ${currentCompany}${dateRange}`);
-              responsibilities.forEach(resp => consolidatedExp.push(resp));
-              consolidatedExp.push(''); // Add spacing
-            }
-
-            // Parse new entry
-            const parts = line.split('|').map(p => p.trim());
-            currentRole = parts[0] || '';
-            currentCompany = parts[1] || '';
-
-            // Extract dates if present
-            if (parts[2]) {
-              const dateMatch = parts[2].match(/(\w+\s+\d{4})\s*-\s*(\w+\s+\d{4}|Present|Current)/i);
-              if (dateMatch) {
-                startDate = dateMatch[1];
-                endDate = dateMatch[2];
-              }
-            }
-
-            responsibilities = [];
-          } else if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {
-            // Add responsibility to current role
-            responsibilities.push(line);
-          }
-        });
-
-        // Add last entry
-        if (currentCompany && currentRole) {
-          const dateRange = startDate && endDate ? ` (${startDate} - ${endDate})` : '';
-          consolidatedExp.push(`${currentRole} | ${currentCompany}${dateRange}`);
-          responsibilities.forEach(resp => consolidatedExp.push(resp));
-        }
-
-        // Replace experience section with consolidated version
-        if (sections['workexperience']) {
-          sections['workexperience'] = consolidatedExp;
-        } else if (sections['experience']) {
-          sections['experience'] = consolidatedExp;
-        }
-      }
-
-      return { sections, headerInfo };
-    };
-
-    const { sections, headerInfo } = parseResume(resume);
-
-    // Header section with enhanced styling
-    if (headerInfo.length > 0) {
+    // Enhanced header section with professional styling
+    if (lines.length > 0) {
       // Header background
-      addBackground(0, y - 5, pageWidth, 40, colors.highlight);
-      addBackground(0, y + 30, pageWidth, 5, colors.background);
+      pdf.setFillColor(colors.highlight[0], colors.highlight[1], colors.highlight[2]);
+      pdf.rect(0, y - 5, pageWidth, 40, 'F');
+      pdf.setFillColor(colors.background[0], colors.background[1], colors.background[2]);
+      pdf.rect(0, y + 30, pageWidth, 5, 'F');
 
       // Name (large, bold, primary color)
-      const name = cleanText(headerInfo[0]);
+      const name = cleanText(lines[0]);
       y = addText(name, margin, y + 8, {
-        fontSize: type === 'cover-letter' ? 18 : type === 'email' ? 16 : 20,
+        fontSize: type === 'cover-letter' ? 18 : type === 'email' ? 16 : 22,
         fontStyle: 'bold',
         color: colors.primary,
-        align: type === 'cover-letter' ? 'right' : 'left'
+        align: 'left'
       });
       y += 2;
 
-      // Title/Role (medium, normal, secondary color)
-      if (headerInfo[1]) {
-        const title = cleanText(headerInfo[1]);
+      // Title/Role (if present in second line)
+      if (lines[1] && !lines[1].includes('@') && !lines[1].includes('phone') && !lines[1].includes('linkedin')) {
+        const title = cleanText(lines[1]);
         y = addText(title, margin, y, {
           fontSize: 12,
           color: colors.secondary,
@@ -375,8 +330,8 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
         y += 3;
       }
 
-      // Contact information in a clean row
-      const contactInfo = headerInfo.slice(2).filter(line =>
+      // Contact information in a clean layout
+      const contactInfo = lines.slice(1).filter(line =>
         line.includes('@') || line.includes('phone') || line.includes('linkedin') ||
         line.includes('github') || line.includes('+') || line.includes('http')
       );
@@ -385,6 +340,7 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
         gmail: '✉',
         phone: '☎',
         linkedin: '💼',
+        github: '🔗'
       };
 
       if (contactInfo.length > 0) {
@@ -392,7 +348,7 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
         let contactX = margin;
         const contactSpacing = (maxWidth) / Math.min(contactInfo.length, 3);
 
-        contactInfo.slice(0, 3).forEach((contact) => {
+        contactInfo.slice(0, 3).forEach((contact: string) => {
           const cleanContact = cleanText(contact);
           let icon = '';
           if (cleanContact.includes('@')) {
@@ -401,12 +357,13 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
             icon = contactIcons.phone;
           } else if (cleanContact.includes('linkedin')) {
             icon = contactIcons.linkedin;
+          } else if (cleanContact.includes('github')) {
+            icon = contactIcons.github;
           }
           addText(`${icon} ${cleanContact}`, contactX, contactY, {
             fontSize: 8,
             color: colors.light,
-            fontStyle: 'normal',
-            highlight: false
+            fontStyle: 'normal'
           });
           contactX += contactSpacing;
         });
@@ -415,13 +372,12 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
         if (contactInfo.length > 3) {
           contactY += 4;
           contactX = margin;
-          contactInfo.slice(3).forEach((contact) => {
+          contactInfo.slice(3).forEach((contact: string) => {
             const cleanContact = cleanText(contact);
             addText(cleanContact, contactX, contactY, {
               fontSize: 8,
               color: colors.light,
-              fontStyle: 'normal',
-              highlight: false
+              fontStyle: 'normal'
             });
             contactX += contactSpacing;
           });
@@ -431,205 +387,126 @@ export const generateUnifiedPDF = ({ resume, language, country, type = 'resume' 
       }
 
       // Professional separator line
-      addLine(margin, y + 2, pageWidth - margin, y + 2, colors.accent, 1);
-      y += 8;
+      addLine(margin, y + 2, pageWidth - margin, y + 2, colors.accent, 1.5);
+      y += 10;
     }
 
-    // Enhanced section rendering with keyword highlighting
-    const addSection = (title: string, content: string[], yPos: number): number => {
-      // Check if we need a new page for the section header
-      if (yPos > pageHeight - 40) {
-        pdf.addPage();
-        yPos = margin;
+    // Process remaining content with enhanced formatting
+    const contentLines = lines.slice(lines.findIndex(line =>
+      line.includes('@') || line.includes('phone') || line.includes('linkedin')
+    ) + 1).filter(line => line.trim().length > 0);
+
+    contentLines.forEach(line => {
+      // Section headers (all caps)
+      if (line.match(/^[A-Z\s&]+$/) && line.length > 3) {
+        y += 8;
+
+        // Add section background
+        pdf.setFillColor(colors.highlight[0], colors.highlight[1], colors.highlight[2]);
+        pdf.rect(0, y - 4, pageWidth, 12, 'F');
+
+        y = addText(line, margin, y + 2, {
+          fontSize: 12,
+          fontStyle: 'bold',
+          color: colors.primary
+        });
+        y += 3;
+        addLine(margin, y, pageWidth - margin, y, colors.accent, 0.8);
+        y += 6;
       }
+      // Job titles with company (contains |)
+      else if (line.includes('|')) {
+        const parts = line.split('|').map(p => p.trim());
 
-      // Section spacing
-      yPos += 8;
+        // Job title with highlight background
+        const titleText = parts[0];
+        const titleWidth = pdf.getTextWidth(titleText);
 
-      // Section header with background
-      const headerHeight = type === 'cover-letter' ? 14 : type === 'email' ? 10 : 12;
-      const headerBg = type === 'email' ? colors.background : colors.highlight;
-      addBackground(0, yPos - 4, pageWidth, headerHeight, headerBg);
+        // Add highlight background for job titles
+        pdf.setFillColor(colors.highlight[0], colors.highlight[1], colors.highlight[2]);
+        pdf.rect(margin - 2, y - 6, titleWidth + 4, 8, 'F');
 
-      // Section title styling
-      const titleStyle = type === 'cover-letter' ? {
-        fontSize: 13,
-        fontStyle: 'bold',
-        color: colors.primary
-      } : type === 'email' ? {
-        fontSize: 11,
-        fontStyle: 'bold',
-        color: colors.secondary
-      } : {
-        fontSize: 12,
-        fontStyle: 'bold',
-        color: colors.primary
-      };
+        // Add job title with keyword highlighting
+        y = addText(titleText, margin, y, {
+          fontSize: 11,
+          fontStyle: 'bold',
+          color: colors.primary,
+          highlight: true
+        });
 
-      yPos = addText(title.toUpperCase(), margin, yPos + 4, titleStyle);
-
-      // Accent line
-      addLine(margin, yPos + 3, pageWidth - margin, yPos + 3, colors.accent, 0.5);
-      yPos += 8;
-
-      // Content with enhanced formatting and keyword highlighting
-      content.forEach(item => {
-        const cleanItem = cleanText(item);
-        if (!cleanItem) return;
-
-        // Check if we need a new page before adding content
-        if (yPos > pageHeight - 25) {
-          pdf.addPage();
-          yPos = margin;
-        }
-
-        if (cleanItem.startsWith('•') || cleanItem.startsWith('-') || cleanItem.startsWith('*')) {
-          // Enhanced bullet points
-          const bulletText = cleanItem.replace(/^[•\-\*]\s*/, '');
-
-          // Draw filled circle bullet point
-          pdf.setFillColor(colors.accent[0], colors.accent[1], colors.accent[2]);
-          pdf.circle(margin + 4, yPos - 1.75, 0.8, 'F');
-
-          // Add bullet text with keyword highlighting
-          yPos = addText(bulletText, margin + 8, yPos - 0.5, {
+        // Company and dates
+        if (parts[1]) {
+          const companyY = y - 4;
+          addText(`| ${parts[1]}`, margin + pdf.getTextWidth(parts[0]) + 5, companyY, {
             fontSize: 10,
-            fontStyle: 'normal',
-            color: colors.secondary,
-            maxWidth: maxWidth - 15,
-            lineHeight: 1.3,
-            highlight: true // Enable keyword highlighting
-          });
-
-          yPos += 1.5;
-
-        } else if (cleanItem.includes('|')) {
-          // Job title with company - enhanced formatting
-          const parts = cleanItem.split('|').map(p => p.trim());
-
-          // Job title with highlight background
-          const titleText = parts[0];
-          const titleWidth = pdf.getTextWidth(titleText);
-
-          // Add highlight background for job titles
-          addBackground(margin - 2, yPos - 6, titleWidth + 4, 8, colors.highlight);
-
-          // Add job title with keyword highlighting
-          yPos = addText(titleText, margin, yPos, {
-            fontSize: 11.5,
             fontStyle: 'bold',
-            color: colors.primary,
-            highlight: true
+            color: colors.primary
           });
-
-          // Company and dates
-          if (parts[1]) {
-            const companyY = yPos - 4;
-            addText(`| ${parts[1]}`, margin + pdf.getTextWidth(parts[0]) + 5, companyY, {
-              fontSize: 10,
-              fontStyle: 'bold',
-              color: colors.primary
-            });
-          }
-          yPos += 3;
-
-        } else {
-          // Regular text
-          const textStyle = type === 'cover-letter' ? {
-            fontSize: 11,
-            fontStyle: 'normal',
-            color: colors.secondary,
-            lineHeight: 1.6,
-            maxWidth: maxWidth - 10,
-            highlight: true
-          } : type === 'email' ? {
-            fontSize: 10.5,
-            fontStyle: 'normal',
-            color: colors.secondary,
-            lineHeight: 1.5,
-            maxWidth: maxWidth - 8,
-            highlight: true
-          } : {
-            fontSize: 10,
-            fontStyle: 'normal',
-            color: colors.secondary,
-            lineHeight: 1.4,
-            highlight: true
-          };
-
-          yPos = addText(cleanItem, margin, yPos, textStyle);
-          yPos += type === 'cover-letter' ? 4 : type === 'email' ? 3 : 2;
         }
-      });
+        y += 4;
+      }
+      // Bullet points
+      else if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {
+        // Enhanced bullet points
+        const bulletText = line.replace(/^[•\-\*]\s*/, '');
 
-      return yPos + 5;
-    };
+        // Draw filled circle bullet point
+        pdf.setFillColor(colors.accent[0], colors.accent[1], colors.accent[2]);
+        pdf.circle(margin + 4, y - 1.5, 0.8, 'F');
 
-    // Define sections based on document type
-    const sectionMappings = type === 'cover-letter' ? [
-      { keys: ['letterheader', 'header'], title: 'Letter Header' },
-      { keys: ['greeting', 'salutation'], title: 'Greeting' },
-      { keys: ['opening', 'introduction'], title: 'Letter Body' },
-      { keys: ['closing', 'conclusion'], title: 'Closing' },
-    ] : type === 'email' ? [
-      { keys: ['subject', 'emailsubject'], title: 'Subject Line' },
-      { keys: ['greeting', 'salutation'], title: 'Greeting' },
-      { keys: ['body', 'content', 'main'], title: 'Email Body' },
-      { keys: ['closing', 'signature'], title: 'Signature' },
-    ] : [
-      { keys: ['professionalsummary', 'summary', 'profile'], title: 'Professional Summary' },
-      { keys: ['keyskills', 'skills', 'technicalskills'], title: 'Key Skills' },
-      { keys: ['workexperience', 'experience', 'employment', 'career'], title: 'Work Experience' },
-      { keys: ['education', 'educationcertifications', 'qualifications'], title: 'Education' },
-      { keys: ['certifications', 'certificates'], title: 'Certifications' },
-      { keys: ['additionalinformation', 'additional', 'other', 'projects'], title: 'Additional Information' }
-    ];
-
-    // Render sections
-    sectionMappings.forEach(mapping => {
-      const foundKey = mapping.keys.find(key => sections[key] && sections[key].length > 0);
-
-      if (foundKey) {
-        console.log(`Rendering section: ${mapping.title} (found as: ${foundKey})`);
-        y = addSection(mapping.title, sections[foundKey], y);
+        // Add bullet text with keyword highlighting
+        y = addText(bulletText, margin + 8, y - 0.5, {
+          fontSize: 10,
+          fontStyle: 'normal',
+          color: colors.secondary,
+          maxWidth: maxWidth - 15,
+          lineHeight: 1.3,
+          highlight: true // Enable keyword highlighting
+        });
+        y += 2;
+      }
+      // Regular content
+      else if (line.length > 0) {
+        y = addText(line, margin, y, {
+          fontSize: 10,
+          color: colors.secondary,
+          highlight: true // Enable keyword highlighting for all content
+        });
+        y += 3;
       }
     });
-
-    // Add any remaining sections that weren't in the standard list
-    Object.entries(sections).forEach(([sectionKey, content]) => {
-      const isAlreadyRendered = sectionMappings.some(mapping =>
-        mapping.keys.includes(sectionKey)
-      );
-
-      if (!isAlreadyRendered && content.length > 0) {
-        const title = sectionKey
-          .replace(/([a-z])([A-Z])/g, '$1 $2')
-          .replace(/^./, str => str.toUpperCase());
-        console.log(`Rendering additional section: ${title}`);
-        y = addSection(title, content, y);
-      }
-    });
-
-    // Smart file naming based on content and type
-    const { name, role } = extractNameAndRole(resume);
-    const countryCode = country.toLowerCase().replace(/[^a-z]/g, '').replace('international', '');
-    const typeLabel = type === 'cover-letter' ? 'cover_letter' :
-                     type === 'email' ? 'email' : 'resume';
-
-    const fileName = countryCode ?
-      `${name}_${role}_${countryCode}_${typeLabel}.pdf` :
-      `${name}_${role}_${typeLabel}.pdf`;
-
-    console.log('Saving professional PDF as:', fileName);
-    pdf.save(fileName);
-
-    return {
-      success: true,
-      fileName
-    };
 
   } catch (error) {
-    console.error('Unified PDF generation error:', error);
-    throw new Error('Failed to generate unified PDF');
+    console.error('PDF generation error:', error);
   }
+
+  // Extract name and role for filename
+  const { name, role } = extractNameAndRole(enhancedContent);
+
+  // Generate filename based on document type
+  const timestamp = new Date().toISOString().split('T')[0];
+  let fileName: string;
+
+  switch (type) {
+    case 'cover-letter':
+      fileName = `${name}_cover_letter_${timestamp}.pdf`;
+      break;
+    case 'email':
+      fileName = `${name}_email_template_${timestamp}.pdf`;
+      break;
+    default:
+      fileName = `${name}_${role}_resume_${timestamp}.pdf`;
+  }
+
+  pdf.save(fileName);
+
+  return {
+    success: true,
+    fileName: fileName,
+    metadata: {
+      generatedAt: new Date().toISOString(),
+      version: '1.0',
+      optimization: 'Enhanced'
+    }
+  };
 };

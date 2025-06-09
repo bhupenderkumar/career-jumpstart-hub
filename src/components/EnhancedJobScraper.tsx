@@ -882,8 +882,8 @@ Best regards,
     if (!generatedCoverLetter || !selectedJob) return;
 
     try {
-      generateEnhancedPDF({
-        resume: generatedCoverLetter,
+      const result = generateEnhancedPDF({
+        document: generatedCoverLetter,
         type: 'cover-letter',
         language: "en",
         country: "International"
@@ -891,8 +891,9 @@ Best regards,
 
       toast({
         title: "Cover Letter Downloaded! 📄",
-        description: `Your cover letter for ${selectedJob.company} has been downloaded as PDF.`,
+        description: `Your cover letter for ${selectedJob.company} has been downloaded as PDF (${result.fileName}).`,
       });
+
     } catch (error) {
       console.error('Cover letter PDF generation failed:', error);
       toast({
@@ -907,8 +908,8 @@ Best regards,
     if (!generatedEmail || !selectedJob) return;
 
     try {
-      generateEnhancedPDF({
-        resume: generatedEmail,
+      const result = generateEnhancedPDF({
+        document: generatedEmail,
         type: 'email',
         language: "en",
         country: "International"
@@ -916,7 +917,7 @@ Best regards,
 
       toast({
         title: "Email Downloaded! 📄",
-        description: `Your application email for ${selectedJob.company} has been downloaded as PDF.`,
+        description: `Your application email for ${selectedJob.company} has been downloaded as PDF (${result.fileName}).`,
       });
     } catch (error) {
       console.error('Email PDF generation failed:', error);
