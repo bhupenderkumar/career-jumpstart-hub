@@ -184,7 +184,7 @@ const ResumeRenderer: React.FC<ResumeRendererProps> = ({ content, className = ""
       // Phone numbers
       .replace(/(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/g, '<a href="tel:$1" class="text-blue-600 hover:text-blue-800 underline font-medium">$1</a>')
       // LinkedIn profiles
-      .replace(/(https?:\/\/www\.linkedin\.com\/in\/[^\s]+)/g, '<a href=\"$1\" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline font-medium">LinkedIn</a>')
+      // .replace(/(https?:\/\/www\.linkedin\.com\/in\/[^\s]+)/g, '<a href=\"$1\" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline font-medium">LinkedIn</a>')
       // URLs
       .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline font-medium">$1</a>');
 
