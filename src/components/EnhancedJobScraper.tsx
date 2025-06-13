@@ -65,6 +65,7 @@ import { generateDocumentPDF } from "@/utils/documentPDFGenerator";
 import PDFPreview from "@/components/PDFPreview";
 import ResumeRenderer from "@/components/ResumeRenderer";
 import { getUserEnvVarAsync, setUserEnvVarAsync } from '../services/env';
+import { generateEnhancedPDF } from "@/utils/enhancedPDFGenerator";
 
 const EnhancedJobScraper = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -501,7 +502,7 @@ ${contactInfo.location ? `   - Location: ${contactInfo.location}` : ''}
       console.log('Starting unified PDF generation for job application...');
 
       const result = generateUnifiedPDF({
-        resume: generatedResume,
+        document: generatedResume,
         language: selectedLanguage,
         country: selectedCountry
       });
@@ -884,9 +885,9 @@ Best regards,
     try {
       const result = generateEnhancedPDF({
         document: generatedCoverLetter,
-        type: 'cover-letter',
         language: "en",
-        country: "International"
+        country: "International",
+        type: 'cover-letter'
       });
 
       toast({
@@ -910,9 +911,9 @@ Best regards,
     try {
       const result = generateEnhancedPDF({
         document: generatedEmail,
-        type: 'email',
         language: "en",
-        country: "International"
+        country: "International",
+        type: 'email'
       });
 
       toast({
@@ -955,12 +956,25 @@ Best regards,
             />
             <button
               className="w-full bg-blue-600 text-white rounded py-2 mt-2"
-              onClick={() => {
+              onClick={async () => {
                 if (envKeyInput && envValueInput) {
-                  setUserEnvVarAsync(envKeyInput, envValueInput);
-                  setEnvKeyInput("");
-                  setEnvValueInput("");
-                  setShowEnvDialog(false);
+                  try {
+                    await setUserEnvVarAsync(envKeyInput, envValueInput);
+                    setEnvKeyInput("");
+                    setEnvValueInput("");
+                    setShowEnvDialog(false);
+                    toast({
+                      title: "API Key Saved",
+                      description: `Successfully saved ${envKeyInput} to local storage.`,
+                    });
+                  } catch (error) {
+                    console.error("Error saving API key:", error);
+                    toast({
+                      title: "Error Saving API Key",
+                      description: `Failed to save ${envKeyInput}. Please try again.`,
+                      variant: "destructive",
+                    });
+                  }
                 }
               }}
             >

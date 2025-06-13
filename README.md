@@ -106,10 +106,6 @@ This project is built with modern web technologies:
 - **PDF Processing**: PDF.js for resume parsing
 - **PDF Generation**: jsPDF for export functionality
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/a35b08ed-5c4b-4619-a57d-f0e77e2d7264) and click on Share -> Publish.
-
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!

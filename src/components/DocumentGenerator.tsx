@@ -15,18 +15,16 @@ import {
   BriefcaseIcon,
   EditIcon,
   RefreshCwIcon,
-  LinkedinIcon,
-  PhoneIcon,
   PrinterIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
 import ResumeRenderer from "@/components/ResumeRenderer";
+import CoverLetterRenderer from "@/components/CoverLetterRenderer";
 import PDFPreview from "@/components/PDFPreview";
-import { generateUnifiedPDF } from "@/utils/unifiedPDFGenerator";
 import { generateCleanPDF } from "@/utils/cleanPDFGenerator";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
-import { createCleanPrintWindow, formatResumeForPrint, formatDocumentForPrint } from "@/utils/printUtils";
+import { createCleanPrintWindow } from "@/utils/printUtils";
 
 interface DocumentGeneratorProps {
   jobDescription: string;
@@ -228,7 +226,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
   };
 
-  const handlePrintDocument = (type: 'resume' | 'cover-letter' | 'email') => {
+  const handlePrintDocument = async (type: 'resume' | 'cover-letter' | 'email') => {
     const content = type === 'resume' ? documents.resume :
                    type === 'cover-letter' ? documents.coverLetter :
                    documents.email;
@@ -247,21 +245,16 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                          'Email Template';
 
     try {
-      // Format content based on document type
-      const formattedContent = type === 'resume'
-        ? formatResumeForPrint(content)
-        : formatDocumentForPrint(content, type);
-
-      // Use the clean print utility
-      createCleanPrintWindow({
-        title: documentTitle,
-        content: formattedContent,
+      // Use the enhanced print utility that renders React components
+      await createCleanPrintWindow({
+        title: `${documentTitle} - ${new Date().toLocaleDateString()}`,
+        content: content,
         documentType: type
       });
 
       toast({
         title: "Print Dialog Opened",
-        description: `Your ${documentTitle.toLowerCase()} is ready to print with clean formatting!`,
+        description: `Your ${documentTitle.toLowerCase()} is ready to print with enhanced Deedy CV formatting!`,
       });
     } catch (error) {
       toast({
@@ -527,9 +520,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                   </div>
                 </div>
                 <div className="border rounded-lg p-6 bg-white max-h-[600px] overflow-y-auto">
-                  <pre className="whitespace-pre-wrap text-sm leading-relaxed font-sans">
-                    {documents.coverLetter}
-                  </pre>
+                  <CoverLetterRenderer content={documents.coverLetter || ''} />
                 </div>
               </div>
             </TabsContent>

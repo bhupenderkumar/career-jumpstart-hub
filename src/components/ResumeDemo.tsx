@@ -10,47 +10,77 @@ Phone: (555) 123-4567
 Email: john.smith@email.com
 Location: San Francisco, CA
 LinkedIn: linkedin.com/in/johnsmith
+GitHub: github.com/johnsmith
 
-PROFESSIONAL SUMMARY
-**Experienced Software Engineer** with **5+ years** of expertise in **React, TypeScript, and Node.js**. Proven track record of developing scalable web applications, leading cross-functional teams, and implementing **modern development practices**. Strong problem-solving skills with experience in **agile methodologies** and **cloud technologies**.
+EDUCATION
+**Stanford University**
+**MS in Computer Science**
+**Dec 2019** | **Stanford, CA**
+**GPA: 3.9/4.0**
 
-KEY SKILLS
-• **Frontend Technologies**: React, TypeScript, JavaScript, HTML5, CSS3
-• **Backend Technologies**: Node.js, Express, Python, REST APIs
-• **Databases**: PostgreSQL, MongoDB, Redis
-• **Cloud Platforms**: AWS, Docker, Kubernetes
-• **Development Tools**: Git, Webpack, Jest, CI/CD
-• **Methodologies**: Agile/Scrum, Test-Driven Development
+**University of California, Berkeley**
+**BS in Computer Science**
+**May 2017** | **Berkeley, CA**
+**Magna Cum Laude**
+**GPA: 3.8/4.0**
 
-WORK EXPERIENCE
+SKILLS
+Programming Languages: **Java** • **Python** • **JavaScript** • **TypeScript** • **C++** • **Go**
 
-**Senior Software Engineer** | **TechCorp Inc.** | **2021 - Present**
-• Developed and maintained **15+ web applications** using React and TypeScript
-• Led a team of **4 developers** in implementing new features and optimizations
-• Improved application performance by **40%** through code optimization and caching
-• Implemented **automated testing** strategies achieving **95% code coverage**
-• Collaborated with **product managers** and **designers** on user experience improvements
+Frameworks & Technologies: **React** • **Node.js** • **Spring Boot** • **Django** • **Express** • **GraphQL**
 
-**Software Engineer** | **StartupTech** | **2019 - 2021**
-• Built responsive web applications using **React** and **modern JavaScript**
-• Integrated **RESTful APIs** and **GraphQL** endpoints with frontend applications
-• Reduced bug reports by **30%** through comprehensive testing and code reviews
-• Contributed to **design system** development improving development efficiency
-• Participated in **agile development** process and daily standups
+Databases & Cloud: **PostgreSQL** • **MongoDB** • **Redis** • **AWS** • **Docker** • **Kubernetes**
 
-EDUCATION & CERTIFICATIONS
-**Bachelor of Science in Computer Science** | **University of California, Berkeley** | **2019**
-• Relevant Coursework: Data Structures, Algorithms, Software Engineering
+Tools & Methodologies: **Git** • **Jenkins** • **CI/CD** • **Agile** • **Scrum** • **TDD**
 
-**Certifications:**
-• **AWS Certified Developer** - Amazon Web Services (2022)
-• **React Developer Certification** - Meta (2021)
+LINKS
+GitHub: https://github.com/johnsmith
+LinkedIn: https://linkedin.com/in/johnsmith
+Portfolio: https://johnsmith.dev
+Blog: https://techblog.johnsmith.dev
 
-ADDITIONAL INFORMATION
-• **Open Source Contributions**: Active contributor to popular React libraries
-• **Technical Blog**: Regular writer on software development topics (**10k+ readers**)
-• **Languages**: English (Native), Spanish (Conversational)
-• **Volunteer Work**: Code mentor for underrepresented groups in tech`;
+COURSEWORK
+**Graduate:**
+Advanced Machine Learning • Distributed Systems • Computer Vision • Natural Language Processing
+
+**Undergraduate:**
+Data Structures • Algorithms • Software Engineering • Database Systems • Computer Networks
+
+EXPERIENCE
+**Senior Software Engineer** | Google | **Jan 2020 - Present** | **Mountain View, CA**
+• Led development of **high-traffic web applications** serving **10M+ users** daily
+• Implemented **microservices architecture** reducing system latency by **45%**
+• Mentored **8 junior engineers** and conducted technical interviews
+• Designed and built **RESTful APIs** and **GraphQL** endpoints
+• Achieved **99.9% uptime** through robust monitoring and alerting systems
+
+**Software Engineer** | Facebook | **Jun 2019 - Dec 2019** | **Menlo Park, CA**
+• Developed **React** components for News Feed optimization
+• Built **machine learning pipelines** processing **1B+ data points** daily
+• Collaborated with **cross-functional teams** to deliver features to **2.8B users**
+• Optimized database queries reducing response time by **60%**
+
+**Software Engineering Intern** | Microsoft | **Jun 2018 - Aug 2018** | **Seattle, WA**
+• Created **Azure** monitoring dashboard using **TypeScript** and **React**
+• Implemented **automated testing** framework increasing code coverage to **95%**
+• Worked on **cloud infrastructure** optimization saving **$50k** annually
+
+RESEARCH
+**Research Assistant** | Stanford AI Lab | **Sep 2018 - May 2019**
+Worked with **Prof. Andrew Ng** on **deep learning** applications for computer vision. Published research on **neural network optimization** in top-tier conferences.
+
+**Undergraduate Researcher** | UC Berkeley EECS | **Jan 2016 - May 2017**
+Developed **distributed algorithms** for large-scale data processing. Research resulted in **2 publications** and **1 patent application**.
+
+AWARDS
+**2020** | **Google Peer Bonus Award** | Top **5%** performer
+**2019** | **Facebook Hackathon Winner** | Best Technical Innovation
+**2017** | **UC Berkeley Outstanding Graduate** | Top **1%** of class
+**2016** | **ACM Programming Contest** | **3rd place** regional finals
+
+PUBLICATIONS
+**"Optimizing Neural Networks for Edge Computing"** | **ICML 2020**
+**"Distributed Data Processing at Scale"** | **VLDB 2018**`;
 
   const rawResume = `JOHN SMITH
 Senior Software Engineer
@@ -58,31 +88,46 @@ Phone: (555) 123-4567
 Email: john.smith@email.com
 Location: San Francisco, CA
 LinkedIn: linkedin.com/in/johnsmith
+GitHub: github.com/johnsmith
 
-PROFESSIONAL SUMMARY
-**Experienced Software Engineer** with **5+ years** of expertise in **React, TypeScript, and Node.js**. Proven track record of developing scalable web applications, leading cross-functional teams, and implementing **modern development practices**. Strong problem-solving skills with experience in **agile methodologies** and **cloud technologies**.
+EDUCATION
+Stanford University
+MS in Computer Science
+Dec 2019 | Stanford, CA
+GPA: 3.9/4.0
 
-KEY SKILLS
-• **Frontend Technologies**: React, TypeScript, JavaScript, HTML5, CSS3
-• **Backend Technologies**: Node.js, Express, Python, REST APIs
-• **Databases**: PostgreSQL, MongoDB, Redis
-• **Cloud Platforms**: AWS, Docker, Kubernetes
-• **Development Tools**: Git, Webpack, Jest, CI/CD
-• **Methodologies**: Agile/Scrum, Test-Driven Development`;
+University of California, Berkeley
+BS in Computer Science
+May 2017 | Berkeley, CA
+Magna Cum Laude
+GPA: 3.8/4.0
+
+SKILLS
+Programming Languages:
+Java • Python • JavaScript • TypeScript • C++ • Go
+
+Frameworks & Technologies:
+React • Node.js • Spring Boot • Django • Express • GraphQL
+
+EXPERIENCE
+Senior Software Engineer | Google | Jan 2020 - Present | Mountain View, CA
+• Led development of high-traffic web applications serving 10M+ users daily
+• Implemented microservices architecture reducing system latency by 45%
+• Mentored 8 junior engineers and conducted technical interviews`;
 
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>Resume Formatting Demo</CardTitle>
+        <CardTitle>Deedy CV Template Demo</CardTitle>
         <CardDescription>
-          See how the resume renderer converts markdown-style formatting into professional display
+          Experience the new Deedy CV-inspired template with ATS-friendly two-column layout, professional typography, and intelligent keyword highlighting
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="formatted" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="formatted">Professional View</TabsTrigger>
-            <TabsTrigger value="raw">Raw Text</TabsTrigger>
+            <TabsTrigger value="formatted">Deedy CV Template</TabsTrigger>
+            <TabsTrigger value="raw">Raw Text Input</TabsTrigger>
           </TabsList>
           
           <TabsContent value="formatted" className="mt-4">

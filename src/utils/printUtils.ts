@@ -1,4 +1,8 @@
 // Utility functions for clean printing without browser headers/footers
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import ResumeRenderer from '@/components/ResumeRenderer';
+import CoverLetterRenderer from '@/components/CoverLetterRenderer';
 
 export interface PrintOptions {
   title: string;
@@ -6,15 +10,58 @@ export interface PrintOptions {
   documentType: 'resume' | 'cover-letter' | 'email';
 }
 
-export const createCleanPrintWindow = ({ title, content, documentType }: PrintOptions): void => {
+// New function to render React components to HTML string for printing
+export const renderComponentToHTML = (content: string, documentType: 'resume' | 'cover-letter' | 'email'): Promise<string> => {
+  return new Promise((resolve) => {
+    // Create a temporary container
+    const tempContainer = document.createElement('div');
+    tempContainer.style.position = 'absolute';
+    tempContainer.style.left = '-9999px';
+    tempContainer.style.top = '-9999px';
+    document.body.appendChild(tempContainer);
+
+    // Create the appropriate component
+    let component;
+    if (documentType === 'resume') {
+      component = React.createElement(ResumeRenderer, { content, className: 'print-version' });
+    } else if (documentType === 'cover-letter') {
+      component = React.createElement(CoverLetterRenderer, { content, className: 'print-version' });
+    } else {
+      // For email, use simple formatting
+      component = React.createElement('div', {
+        dangerouslySetInnerHTML: { __html: formatDocumentForPrint(content, 'email') }
+      });
+    }
+
+    // Render the component
+    const root = createRoot(tempContainer);
+    root.render(component);
+
+    // Wait for rendering to complete
+    setTimeout(() => {
+      const html = tempContainer.innerHTML;
+
+      // Clean up
+      root.unmount();
+      document.body.removeChild(tempContainer);
+
+      resolve(html);
+    }, 100);
+  });
+};
+
+export const createCleanPrintWindow = async ({ title, content, documentType }: PrintOptions): Promise<void> => {
   // Create a new window for printing
   const printWindow = window.open('', '_blank', 'width=800,height=600');
-  
+
   if (!printWindow) {
     throw new Error('Print window blocked. Please allow popups to enable printing.');
   }
 
-  // Create the complete HTML document with advanced print styling
+  // Get the rendered HTML from the React component
+  const renderedHTML = await renderComponentToHTML(content, documentType);
+
+  // Create the complete HTML document with Deedy CV print styling
   const printContent = `
     <!DOCTYPE html>
     <html>
@@ -22,6 +69,7 @@ export const createCleanPrintWindow = ({ title, content, documentType }: PrintOp
         <title>${title}</title>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet">
         <style>
           /* Reset and base styles */
           * {
@@ -29,29 +77,291 @@ export const createCleanPrintWindow = ({ title, content, documentType }: PrintOp
             padding: 0;
             box-sizing: border-box;
           }
-          
+
           /* Print-specific styles */
           @media print {
             @page {
               margin: 0.5in;
               size: A4;
-              /* Remove browser headers and footers */
-              margin-top: 0.5in;
-              margin-bottom: 0.5in;
-              margin-left: 0.5in;
-              margin-right: 0.5in;
             }
-            
+
             body {
               -webkit-print-color-adjust: exact !important;
               color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
-            
-            /* Hide any potential browser elements */
+
             .no-print {
               display: none !important;
             }
+          }
+
+          /* Deedy CV Print Styles */
+          body {
+            font-family: 'Lato', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #374151;
+            margin: 0;
+            padding: 0;
+            background: white;
+            font-size: 12pt;
+          }
+
+          .print-version {
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          /* Deedy CV styles for print */
+          .deedy-resume {
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 12pt !important;
+            line-height: 1.5 !important;
+          }
+
+          .deedy-header {
+            margin-bottom: 20px !important;
+            padding-bottom: 15px !important;
+            border-bottom: 2px solid #374151 !important;
+          }
+
+          .deedy-name {
+            font-size: 24pt !important;
+            font-weight: 700 !important;
+            color: #374151 !important;
+            margin-bottom: 8px !important;
+          }
+
+          .deedy-title {
+            font-size: 14pt !important;
+            color: #6b7280 !important;
+            margin-bottom: 12px !important;
+          }
+
+          .deedy-contact {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            justify-content: center !important;
+            gap: 15px !important;
+            font-size: 11pt !important;
+          }
+
+          .deedy-contact-item {
+            background: none !important;
+            border: none !important;
+            padding: 0 !important;
+            color: #374151 !important;
+          }
+
+          .deedy-columns {
+            display: grid !important;
+            grid-template-columns: 1fr 2fr !important;
+            gap: 30px !important;
+            margin-top: 20px !important;
+          }
+
+          .deedy-left-column {
+            space-y: 15px !important;
+          }
+
+          .deedy-right-column {
+            space-y: 20px !important;
+          }
+
+          .deedy-section {
+            margin-bottom: 20px !important;
+          }
+
+          .deedy-section-header {
+            font-size: 14pt !important;
+            font-weight: 700 !important;
+            color: #374151 !important;
+            margin-bottom: 10px !important;
+            padding-bottom: 5px !important;
+            border-bottom: 1px solid #d1d5db !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.05em !important;
+          }
+
+          .deedy-section-content {
+            margin-top: 10px !important;
+          }
+
+          .deedy-company-name {
+            font-weight: 700 !important;
+            color: #374151 !important;
+            font-size: inherit !important;
+          }
+
+          .deedy-experience-entry {
+            margin-bottom: 15px !important;
+            padding: 10px !important;
+            background: #f9fafb !important;
+            border-left: 3px solid #6b7280 !important;
+          }
+
+          .deedy-experience-header {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: flex-start !important;
+            margin-bottom: 8px !important;
+          }
+
+          .deedy-position-company {
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+          }
+
+          .deedy-position {
+            font-weight: 600 !important;
+            color: #374151 !important;
+          }
+
+          .deedy-company-separator {
+            color: #6b7280 !important;
+            font-weight: 700 !important;
+          }
+
+          .deedy-dates {
+            font-size: 10pt !important;
+            color: #6b7280 !important;
+            background: white !important;
+            padding: 4px 8px !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 4px !important;
+          }
+
+          .deedy-bullet-item {
+            display: flex !important;
+            align-items: flex-start !important;
+            margin-bottom: 8px !important;
+            padding: 0 !important;
+            background: none !important;
+          }
+
+          .deedy-bullet-point {
+            width: 6px !important;
+            height: 6px !important;
+            background: #374151 !important;
+            border-radius: 50% !important;
+            margin-top: 6px !important;
+            margin-right: 12px !important;
+            flex-shrink: 0 !important;
+          }
+
+          .deedy-bullet-content {
+            font-size: 11pt !important;
+            line-height: 1.5 !important;
+            color: #374151 !important;
+          }
+
+          .deedy-text-content {
+            font-size: 11pt !important;
+            line-height: 1.5 !important;
+            color: #374151 !important;
+            margin-bottom: 8px !important;
+          }
+
+          .deedy-skill-category {
+            margin-bottom: 12px !important;
+          }
+
+          .deedy-skill-category-title {
+            font-size: 11pt !important;
+            font-weight: 700 !important;
+            color: #374151 !important;
+            margin-bottom: 6px !important;
+          }
+
+          .deedy-skill-tags {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+          }
+
+          .deedy-skill-tag {
+            background: #f3f4f6 !important;
+            color: #374151 !important;
+            padding: 3px 8px !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 4px !important;
+            font-size: 10pt !important;
+            font-weight: 500 !important;
+          }
+
+          /* Highlighting for print */
+          .deedy-tech-highlight {
+            background: #e0f2fe !important;
+            color: #0277bd !important;
+            padding: 2px 4px !important;
+            border-radius: 3px !important;
+            font-weight: 600 !important;
+            font-size: 10pt !important;
+          }
+
+          .deedy-keyword-highlight {
+            background: #e8f5e8 !important;
+            color: #2e7d32 !important;
+            padding: 2px 4px !important;
+            border-radius: 3px !important;
+            font-weight: 600 !important;
+            font-size: 10pt !important;
+          }
+
+          .deedy-metric-highlight {
+            background: #fff3e0 !important;
+            color: #f57c00 !important;
+            padding: 2px 4px !important;
+            border-radius: 3px !important;
+            font-weight: 600 !important;
+            font-size: 10pt !important;
+          }
+
+          /* Links for print */
+          a {
+            color: #374151 !important;
+            text-decoration: none !important;
+          }
+
+          /* Cover letter styles */
+          .deedy-cover-letter {
+            max-width: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 12pt !important;
+          }
+
+          .deedy-cl-header {
+            margin-bottom: 20px !important;
+            padding-bottom: 15px !important;
+            border-bottom: 1px solid #d1d5db !important;
+          }
+
+          .deedy-cl-name {
+            font-size: 20pt !important;
+            font-weight: 700 !important;
+            color: #374151 !important;
+          }
+
+          .deedy-cl-contact {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 15px !important;
+            font-size: 11pt !important;
+          }
+
+          .deedy-cl-body {
+            line-height: 1.6 !important;
+          }
+
+          .deedy-cl-paragraph {
+            margin-bottom: 12px !important;
+            text-align: justify !important;
+            font-size: 12pt !important;
           }
           
           /* Screen and print styles */
@@ -245,7 +555,7 @@ export const createCleanPrintWindow = ({ title, content, documentType }: PrintOp
       </head>
       <body>
         <div class="document-container">
-          ${content}
+          ${renderedHTML}
         </div>
         
         <script>
@@ -305,7 +615,16 @@ export const formatResumeForPrint = (resumeText: string): string => {
     }
     // Detect contact info
     else if (trimmedLine.match(/@|phone:|email:|linkedin:|github:/i)) {
-      html += `<span class="contact">${highlightedLine}</span>`;
+      // Make links clickable in print view
+      const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/i;
+      let contactLine = highlightedLine;
+      if (trimmedLine.match(urlRegex)) {
+        contactLine = trimmedLine.replace(urlRegex, (url) => {
+          const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+          return `<a href="${fullUrl}" target="_blank">${url}</a>`;
+        });
+      }
+      html += `<span class="contact">${contactLine}</span>`;
     }
     // Check if it's a name (first line, likely all caps or title case)
     else if (index === 0 && trimmedLine.match(/^[A-Z\s]+$/)) {

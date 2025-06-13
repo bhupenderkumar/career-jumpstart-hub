@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -37,6 +38,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments } from "@/services/geminiAI";
 import { populateSampleData, clearApplicationData } from "@/utils/sampleData";
+import CoverLetterRenderer from "@/components/CoverLetterRenderer";
+import ResumeRenderer from "@/components/ResumeRenderer";
 import * as XLSX from 'xlsx';
 
 interface Application {
@@ -59,6 +62,8 @@ const ApplicationManager: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month' | 'custom'>('all');
+  const [customDateRange, setCustomDateRange] = useState({ start: '', end: '' });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -85,11 +90,49 @@ const ApplicationManager: React.FC = () => {
     }
   };
 
-  const filteredApplications = applications.filter(app =>
-    app.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    app.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    app.jobDescription.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredApplications = applications.filter(app => {
+    // Text search filter
+    const matchesSearch = app.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      app.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      app.jobDescription.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Date filter
+    const appDate = new Date(app.timestamp || app.date);
+    const now = new Date();
+    let matchesDate = true;
+
+    switch (dateFilter) {
+      case 'today':
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        matchesDate = appDate >= today && appDate < tomorrow;
+        break;
+      case 'week':
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        matchesDate = appDate >= weekAgo;
+        break;
+      case 'month':
+        const monthAgo = new Date();
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        matchesDate = appDate >= monthAgo;
+        break;
+      case 'custom':
+        if (customDateRange.start && customDateRange.end) {
+          const startDate = new Date(customDateRange.start);
+          const endDate = new Date(customDateRange.end);
+          endDate.setHours(23, 59, 59, 999); // Include the entire end date
+          matchesDate = appDate >= startDate && appDate <= endDate;
+        }
+        break;
+      default:
+        matchesDate = true;
+    }
+
+    return matchesSearch && matchesDate;
+  });
 
   const exportToExcel = () => {
     try {
@@ -259,19 +302,72 @@ const ApplicationManager: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative flex-1">
-              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search by job title, company, or description..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="relative flex-1">
+                <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search by job title, company, or description..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Badge variant="secondary">
+                {filteredApplications.length} of {applications.length} applications
+              </Badge>
             </div>
-            <Badge variant="secondary">
-              {filteredApplications.length} of {applications.length} applications
-            </Badge>
+
+            {/* Date Filter Section */}
+            <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="w-4 h-4 text-gray-600" />
+                <span className="text-sm font-medium text-gray-700">Filter by Date:</span>
+              </div>
+              <Select value={dateFilter} onValueChange={(value: 'all' | 'today' | 'week' | 'month' | 'custom') => setDateFilter(value)}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Select period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">Last 7 Days</SelectItem>
+                  <SelectItem value="month">Last 30 Days</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {dateFilter === 'custom' && (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={customDateRange.start}
+                    onChange={(e) => setCustomDateRange(prev => ({ ...prev, start: e.target.value }))}
+                    className="w-40"
+                  />
+                  <span className="text-gray-500">to</span>
+                  <Input
+                    type="date"
+                    value={customDateRange.end}
+                    onChange={(e) => setCustomDateRange(prev => ({ ...prev, end: e.target.value }))}
+                    className="w-40"
+                  />
+                </div>
+              )}
+
+              {dateFilter !== 'all' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDateFilter('all');
+                    setCustomDateRange({ start: '', end: '' });
+                  }}
+                >
+                  Clear Filter
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -308,9 +404,18 @@ const ApplicationManager: React.FC = () => {
                   <TableRow key={app.id}>
                     <TableCell className="font-medium">{app.jobTitle}</TableCell>
                     <TableCell>{app.company}</TableCell>
-                    <TableCell className="flex items-center gap-1">
-                      <CalendarIcon className="w-3 h-3" />
-                      {app.date}
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <CalendarIcon className="w-3 h-3" />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{app.date}</span>
+                          {app.timestamp && (
+                            <span className="text-xs text-gray-500">
+                              {new Date(app.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">v{app.version}</Badge>
@@ -435,8 +540,8 @@ const ApplicationDetails: React.FC<ApplicationDetailsProps> = ({
                 Copy
               </Button>
             </div>
-            <div className="border rounded-lg p-4 bg-gray-50 max-h-96 overflow-y-auto">
-              <pre className="whitespace-pre-wrap text-sm">{application.resume}</pre>
+            <div className="border rounded-lg p-4 bg-white max-h-96 overflow-y-auto">
+              <ResumeRenderer content={application.resume} />
             </div>
           </div>
         </TabsContent>
@@ -453,8 +558,8 @@ const ApplicationDetails: React.FC<ApplicationDetailsProps> = ({
                 Copy
               </Button>
             </div>
-            <div className="border rounded-lg p-4 bg-gray-50 max-h-96 overflow-y-auto">
-              <pre className="whitespace-pre-wrap text-sm">{application.coverLetter}</pre>
+            <div className="border rounded-lg p-4 bg-white max-h-96 overflow-y-auto">
+              <CoverLetterRenderer content={application.coverLetter} />
             </div>
           </div>
         </TabsContent>
