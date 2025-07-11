@@ -64,6 +64,20 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       console.log('📝 Job description length:', jobDescription.length);
       console.log('📄 Base resume provided:', !!baseResume);
 
+      // Show language selection in toast
+      const languageNames = {
+        'en': 'English',
+        'ja': 'Japanese',
+        'es': 'Spanish',
+        'fr': 'French',
+        'de': 'German'
+      };
+
+      toast({
+        title: "Generating Documents",
+        description: `Creating documents in ${languageNames[language as keyof typeof languageNames] || language} for ${country} market...`,
+      });
+
       const result = await generateAllDocuments({
         jobDescription,
         baseResume,
