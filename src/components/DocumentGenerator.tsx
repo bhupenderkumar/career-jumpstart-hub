@@ -22,7 +22,7 @@ import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
 import ResumeRenderer from "@/components/ResumeRenderer";
 import CoverLetterRenderer from "@/components/CoverLetterRenderer";
 import PDFPreview from "@/components/PDFPreview";
-import { generateCleanPDF } from "@/utils/cleanPDFGenerator";
+import { generateATSOptimizedPDF } from "@/utils/atsOptimizedPDFGenerator";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
 import { createCleanPrintWindow } from "@/utils/printUtils";
 
@@ -83,7 +83,14 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
         baseResume,
         language,
         country,
-        generateType: 'all'
+        generateType: 'all',
+        onModelChange: (modelName, documentType) => {
+          toast({
+            title: "Trying Different AI Model",
+            description: `Using ${modelName} for ${documentType} generation...`,
+            duration: 2000,
+          });
+        }
       });
 
       console.log('✅ Documents generated successfully for language:', language);
@@ -100,9 +107,28 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       });
     } catch (error) {
       console.error('Document generation error:', error);
+
+      let errorTitle = "Generation Error";
+      let errorDescription = "Failed to generate documents. Please try again.";
+
+      if (error instanceof Error) {
+        if (error.message.includes('503') || error.message.includes('overloaded') || error.message.includes('UNAVAILABLE')) {
+          errorTitle = "AI Service Overloaded";
+          errorDescription = "All AI models are currently overloaded. Please try again in a few minutes.";
+        } else if (error.message.includes('API key')) {
+          errorTitle = "API Key Error";
+          errorDescription = "Please check your Gemini API key configuration.";
+        } else if (error.message.includes('All Gemini models failed')) {
+          errorTitle = "AI Service Unavailable";
+          errorDescription = "All AI models are currently unavailable. Please try again later.";
+        } else {
+          errorDescription = error.message;
+        }
+      }
+
       toast({
-        title: "Generation Error",
-        description: "Failed to generate documents. Please try again.",
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive",
       });
     } finally {
@@ -137,7 +163,14 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
         editPrompt: enhancementPrompt,
         language,
         country,
-        generateType: 'all'
+        generateType: 'all',
+        onModelChange: (modelName, documentType) => {
+          toast({
+            title: "Trying Different AI Model",
+            description: `Using ${modelName} for ${documentType} enhancement...`,
+            duration: 2000,
+          });
+        }
       });
 
       setDocuments(result);
@@ -169,7 +202,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      const pdfBlob = generateCleanPDF({
+      const pdfBlob = generateATSOptimizedPDF({
         content: documents.resume,
         type: 'resume'
       });
@@ -186,8 +219,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       URL.revokeObjectURL(url);
 
       toast({
-        title: "Resume Downloaded",
-        description: "Clean, professional PDF resume has been downloaded successfully!",
+        title: "ATS-Optimized Resume Downloaded",
+        description: "Your ATS-friendly, professional PDF resume has been downloaded successfully!",
       });
     } catch (error) {
       console.error('PDF generation error:', error);
@@ -210,7 +243,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      const pdfBlob = generateCleanPDF({
+      const pdfBlob = generateATSOptimizedPDF({
         content: documents.coverLetter,
         type: 'cover-letter'
       });
@@ -227,8 +260,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       URL.revokeObjectURL(url);
 
       toast({
-        title: "Cover Letter Downloaded",
-        description: "Clean, professional PDF cover letter has been downloaded successfully!",
+        title: "ATS-Optimized Cover Letter Downloaded",
+        description: "Your ATS-friendly, professional PDF cover letter has been downloaded successfully!",
       });
     } catch (error) {
       console.error('PDF generation error:', error);

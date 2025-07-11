@@ -19,6 +19,7 @@ export interface ResumeGenerationRequest {
   language?: string;
   country?: string;
   generateType?: 'resume' | 'cover-letter' | 'email' | 'all';
+  onModelChange?: (modelName: string, documentType: string) => void;
 }
 
 export interface GenerationResult {
@@ -48,19 +49,66 @@ export const generateResumeWithAI = async ({
 };
 
 
+// Available Gemini models in order of preference
+const GEMINI_MODELS = [
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
+  "gemini-pro",
+  "gemini-1.0-pro"
+];
+
+// Function to try multiple models with fallback
+const generateWithFallback = async (prompt: string, genAI: any, onModelChange?: (model: string) => void): Promise<string> => {
+  let lastError: any = null;
+
+  for (const modelName of GEMINI_MODELS) {
+    try {
+      console.log(`🤖 Trying model: ${modelName}`);
+      if (onModelChange) {
+        onModelChange(modelName);
+      }
+
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      if (text && text.trim()) {
+        console.log(`✅ Success with model: ${modelName}`);
+        return text;
+      }
+    } catch (error: any) {
+      console.warn(`❌ Model ${modelName} failed:`, error.message);
+      lastError = error;
+
+      // If it's a 503 (overloaded) error, try next model
+      if (error.message?.includes('503') || error.message?.includes('overloaded') || error.message?.includes('UNAVAILABLE')) {
+        console.log(`🔄 Model ${modelName} is overloaded, trying next model...`);
+        continue;
+      }
+
+      // For other errors, also try next model but log differently
+      console.log(`⚠️ Model ${modelName} error, trying next model...`);
+    }
+  }
+
+  // If all models failed, throw the last error
+  throw new Error(`All Gemini models failed. Last error: ${lastError?.message || 'Unknown error'}`);
+};
+
 export const generateAllDocuments = async ({
   jobDescription,
   baseResume,
   editPrompt,
   language = 'en',
   country = 'International',
-  generateType = 'all'
+  generateType = 'all',
+  onModelChange
 }: ResumeGenerationRequest): Promise<GenerationResult> => {
   try {
     console.log('🌍 AI Service - Generating documents with language:', language, 'country:', country);
 
     const genAI = await getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // Get language-specific formatting and cultural guidelines
     const getLanguageGuidelines = (lang: string, country: string) => {
@@ -377,11 +425,17 @@ IMPORTANT: Create a complete email with NO placeholder text. Use generic profess
 
     const result: GenerationResult = {};
 
-    // Generate each requested document
+    // Generate each requested document with model fallback
     for (const [type, prompt] of Object.entries(prompts)) {
       try {
-        const response = await model.generateContent(prompt);
-        const content = response.response.text();
+        console.log(`📝 Generating ${type}...`);
+
+        const content = await generateWithFallback(prompt, genAI, (modelName) => {
+          console.log(`🔄 Using model ${modelName} for ${type}`);
+          if (onModelChange) {
+            onModelChange(modelName, type);
+          }
+        });
 
         if (type === 'resume') {
           result.resume = content;
@@ -390,9 +444,11 @@ IMPORTANT: Create a complete email with NO placeholder text. Use generic profess
         } else if (type === 'email') {
           result.email = content;
         }
+
+        console.log(`✅ Successfully generated ${type}`);
       } catch (error) {
-        console.error(`Error generating ${type}:`, error);
-        throw new Error(`Failed to generate ${type}. Please check your API key and try again.`);
+        console.error(`❌ Error generating ${type}:`, error);
+        throw new Error(`Failed to generate ${type}. ${error instanceof Error ? error.message : 'Please check your API key and try again.'}`);
       }
     }
 
