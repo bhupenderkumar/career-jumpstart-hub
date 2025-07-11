@@ -108,7 +108,6 @@ const ResumeRenderer: React.FC<ResumeRendererProps> = ({ content, className = ""
             resumeData.leftColumn.links.push(line);
             break;
           case 'coursework':
-          case 'coursework':
             resumeData.leftColumn.coursework.push(line);
             break;
           case 'experience':

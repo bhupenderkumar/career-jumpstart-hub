@@ -4,19 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BriefcaseIcon, FileTextIcon, MapPinIcon, SparklesIcon, GlobeIcon, UserIcon } from "lucide-react";
+import { FileTextIcon, SparklesIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ResumeUpload from "@/components/ResumeUpload";
 import ResumeViewer from "@/components/ResumeViewer";
 import AIInsights from "@/components/AIInsights";
 import LoadingAnimation from "@/components/LoadingAnimation";
-import JobScraper from "@/components/JobScraper";
-import JSearchTest from "@/components/JSearchTest";
-import EnhancedJobScraper from "@/components/EnhancedJobScraper";
-import ContactInfoTest from "@/components/ContactInfoTest";
 import LanguageSelector from "@/components/LanguageSelector";
 import DocumentGenerator from "@/components/DocumentGenerator";
-import ApplicationManager from "@/components/ApplicationManager";
 import DownloadDemo from "@/components/DownloadDemo";
 import { generateResumeWithAI } from "@/services/geminiAI";
 import { getUserEnvVarAsync, setUserEnvVarAsync } from '../services/env';
@@ -24,9 +19,6 @@ import { Settings2Icon } from 'lucide-react';
 
 const REQUIRED_KEYS = [
   { key: 'VITE_GEMINI_API_KEY', label: 'Gemini API Key' },
-  { key: 'VITE_RAPIDAPI_KEY', label: 'RapidAPI Key' },
-  { key: 'VITE_ADZUNA_APP_ID', label: 'Adzuna App ID' },
-  { key: 'VITE_ADZUNA_APP_KEY', label: 'Adzuna App Key' },
 ];
 
 const Index = () => {
@@ -34,7 +26,7 @@ const Index = () => {
   const [generatedResume, setGeneratedResume] = useState("");
   const [baseResume, setBaseResume] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [applications, setApplications] = useState<any[]>([]);
+
   const [showApiKeyWarning, setShowApiKeyWarning] = useState(false);
   const [previousResume, setPreviousResume] = useState("");
   const [generationStage, setGenerationStage] = useState("");
@@ -49,16 +41,11 @@ const Index = () => {
   useEffect(() => {
     const savedJobDetails = localStorage.getItem("jobDetails");
     const savedResume = localStorage.getItem("generatedResume");
-    const savedApplications = localStorage.getItem("applications");
-
     if (savedJobDetails) {
       setJobDetails(savedJobDetails);
     }
     if (savedResume) {
       setGeneratedResume(savedResume);
-    }
-    if (savedApplications) {
-      setApplications(JSON.parse(savedApplications));
     }
 
     // Check if API key is configured
@@ -292,7 +279,7 @@ const Index = () => {
         {/* Main Content */}
         <main className="container mx-auto px-4 py-8">
           <Tabs defaultValue="generate" className="w-full">
-            <TabsList className="grid w-full grid-cols-8">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="generate" className="flex items-center gap-2">
                 <FileTextIcon className="w-4 h-4" />
                 Generate Resume
@@ -302,28 +289,8 @@ const Index = () => {
                 🎯 Download Hub
               </TabsTrigger>
               <TabsTrigger value="applications" className="flex items-center gap-2">
-                <BriefcaseIcon className="w-4 h-4" />
+                <FileTextIcon className="w-4 h-4" />
                 Applications
-              </TabsTrigger>
-              <TabsTrigger value="super-search" className="flex items-center gap-2">
-                <SparklesIcon className="w-4 h-4" />
-                🚀 Super Search
-              </TabsTrigger>
-              <TabsTrigger value="contact-test" className="flex items-center gap-2">
-                <UserIcon className="w-4 h-4" />
-                Contact Test
-              </TabsTrigger>
-              <TabsTrigger value="web3-jobs" className="flex items-center gap-2">
-                <GlobeIcon className="w-4 h-4" />
-                Web3 Jobs
-              </TabsTrigger>
-              <TabsTrigger value="jsearch-test" className="flex items-center gap-2">
-                <SparklesIcon className="w-4 h-4" />
-                LinkedIn API Test
-              </TabsTrigger>
-              <TabsTrigger value="locations" className="flex items-center gap-2">
-                <MapPinIcon className="w-4 h-4" />
-                Locations
               </TabsTrigger>
             </TabsList>
 
@@ -427,42 +394,17 @@ const Index = () => {
 
             {/* Applications Tab */}
             <TabsContent value="applications" className="mt-6">
-              <ApplicationManager />
-            </TabsContent>
-
-            {/* Super Search Tab */}
-            <TabsContent value="super-search" className="mt-6">
-              <EnhancedJobScraper />
-            </TabsContent>
-
-            {/* Contact Test Tab */}
-            <TabsContent value="contact-test" className="mt-6">
-              <ContactInfoTest />
-            </TabsContent>
-
-            {/* Web3 Jobs Tab */}
-            <TabsContent value="web3-jobs" className="mt-6">
-              <JobScraper />
-            </TabsContent>
-
-            {/* JSearch API Test Tab */}
-            <TabsContent value="jsearch-test" className="mt-6">
-              <JSearchTest />
-            </TabsContent>
-
-            {/* Locations Tab */}
-            <TabsContent value="locations" className="mt-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Job Locations</CardTitle>
+                  <CardTitle>Application Tracker</CardTitle>
                   <CardDescription>
-                    Filter and view applications by location
+                    Track your resume applications and their status
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="text-center py-8 text-muted-foreground">
-                    <MapPinIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No locations tracked yet. Start applying to jobs to see location data!</p>
+                    <FileTextIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No applications tracked yet. Generate resumes and track your applications here!</p>
                   </div>
                 </CardContent>
               </Card>
