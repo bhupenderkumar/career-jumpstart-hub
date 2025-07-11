@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
 import ResumeRenderer from "@/components/ResumeRenderer";
 import CoverLetterRenderer from "@/components/CoverLetterRenderer";
-import EnhancedDownloadManager from "@/components/EnhancedDownloadManager";
+import EnhancedPrintManager from "@/components/EnhancedPrintManager";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
 import { createCleanPrintWindow } from "@/utils/printUtils";
 
@@ -383,10 +383,10 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
           </Card>
         )}
 
-        {/* Enhanced Download Manager */}
+        {/* Enhanced Print Manager */}
         {Object.keys(documents).length > 0 && (
           <div className="mb-6">
-            <EnhancedDownloadManager
+            <EnhancedPrintManager
               documents={documents}
               language={language}
               country={country}
