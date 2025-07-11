@@ -9,7 +9,6 @@ import {
   FileTextIcon,
   MailIcon,
   FileIcon,
-  DownloadIcon,
   SparklesIcon,
   CheckCircleIcon,
   BriefcaseIcon,
@@ -21,8 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
 import ResumeRenderer from "@/components/ResumeRenderer";
 import CoverLetterRenderer from "@/components/CoverLetterRenderer";
-import PDFPreview from "@/components/PDFPreview";
-import { generateATSOptimizedPDF } from "@/utils/atsOptimizedPDFGenerator";
+import EnhancedDownloadManager from "@/components/EnhancedDownloadManager";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
 import { createCleanPrintWindow } from "@/utils/printUtils";
 
@@ -45,7 +43,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
   const [enhancementPrompt, setEnhancementPrompt] = useState("");
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [showPWAPrompt, setShowPWAPrompt] = useState(false);
-  const [downloadInfo, setDownloadInfo] = useState<{type: 'resume' | 'cover-letter' | 'email', fileName?: string}>({type: 'resume'});
+
   const { toast } = useToast();
 
   const handleGenerateAll = async () => {
@@ -191,87 +189,9 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
   };
 
-  const handleDownloadPDF = () => {
-    if (!documents.resume) {
-      toast({
-        title: "No Resume",
-        description: "Please generate documents first.",
-        variant: "destructive",
-      });
-      return;
-    }
 
-    try {
-      const pdfBlob = generateATSOptimizedPDF({
-        content: documents.resume,
-        type: 'resume'
-      });
 
-      // Generate a clean filename
-      const fileName = `resume_${new Date().toISOString().split('T')[0]}.pdf`;
 
-      // Create download link
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "ATS-Optimized Resume Downloaded",
-        description: "Your ATS-friendly, professional PDF resume has been downloaded successfully!",
-      });
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast({
-        title: "Download Error",
-        description: "Failed to generate PDF. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDownloadCoverLetterPDF = () => {
-    if (!documents.coverLetter) {
-      toast({
-        title: "No Cover Letter",
-        description: "Please generate documents first.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const pdfBlob = generateATSOptimizedPDF({
-        content: documents.coverLetter,
-        type: 'cover-letter'
-      });
-
-      // Generate a clean filename
-      const fileName = `cover_letter_${new Date().toISOString().split('T')[0]}.pdf`;
-
-      // Create download link
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "ATS-Optimized Cover Letter Downloaded",
-        description: "Your ATS-friendly, professional PDF cover letter has been downloaded successfully!",
-      });
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast({
-        title: "Download Error",
-        description: "Failed to generate PDF. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handlePrintDocument = async (type: 'resume' | 'cover-letter' | 'email') => {
     const content = type === 'resume' ? documents.resume :
@@ -462,16 +382,24 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
             </CardContent>
           </Card>
         )}
+
+        {/* Enhanced Download Manager */}
+        {Object.keys(documents).length > 0 && (
+          <div className="mb-6">
+            <EnhancedDownloadManager
+              documents={documents}
+              language={language}
+              country={country}
+            />
+          </div>
+        )}
+
         {Object.keys(documents).length > 0 ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="resume" className="flex items-center gap-2">
                 <FileTextIcon className="w-4 h-4" />
                 Resume
-              </TabsTrigger>
-              <TabsTrigger value="pdf" className="flex items-center gap-2">
-                <DownloadIcon className="w-4 h-4" />
-                PDF Preview
               </TabsTrigger>
               <TabsTrigger value="cover-letter" className="flex items-center gap-2">
                 <FileIcon className="w-4 h-4" />
@@ -504,15 +432,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                       <PrinterIcon className="w-3 h-3 mr-1" />
                       Print
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleDownloadPDF}
-                      className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
-                    >
-                      <DownloadIcon className="w-3 h-3 mr-1" />
-                      PDF
-                    </Button>
+
                   </div>
                 </div>
                 <div className="border rounded-lg p-4 bg-white max-h-[600px] overflow-y-auto">
@@ -521,14 +441,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
               </div>
             </TabsContent>
 
-            <TabsContent value="pdf" className="mt-4">
-              <PDFPreview
-                resume={documents.resume || ''}
-                language={language}
-                country={country}
-                onDownload={handleDownloadPDF}
-              />
-            </TabsContent>
+
 
             <TabsContent value="cover-letter" className="mt-4">
               <div className="space-y-4">
@@ -551,15 +464,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                       <PrinterIcon className="w-3 h-3 mr-1" />
                       Print
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleDownloadCoverLetterPDF}
-                      className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
-                    >
-                      <DownloadIcon className="w-3 h-3 mr-1" />
-                      PDF
-                    </Button>
+
                     <Badge className="bg-blue-100 text-blue-800">
                       <CheckCircleIcon className="w-3 h-3 mr-1" />
                       {country} Format
@@ -644,8 +549,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       <PWADownloadPrompt
         show={showPWAPrompt}
         onClose={() => setShowPWAPrompt(false)}
-        downloadType={downloadInfo.type}
-        fileName={downloadInfo.fileName}
+        downloadType="resume"
+        fileName="resume.pdf"
       />
     </Card>
   );
