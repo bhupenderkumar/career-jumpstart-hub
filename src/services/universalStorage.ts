@@ -7,24 +7,37 @@ const FILE_PATH = '/userEnvVars.json'; // Root-level file for browser download/u
 export const universalStorage = {
   // Get value by key (localStorage first, then file)
   async get(key: string): Promise<string | undefined> {
+    console.log(`🔍 UniversalStorage.get: ${key}`);
     // Try localStorage
     const local = localStorage.getItem(STORAGE_KEY);
     if (local) {
       try {
         const obj = JSON.parse(local);
-        if (obj[key]) return obj[key];
-      } catch {}
+        if (obj[key]) {
+          console.log(`✅ UniversalStorage.get: Found ${key} in localStorage`);
+          return obj[key];
+        }
+      } catch (e) {
+        console.warn(`⚠️ UniversalStorage.get: Error parsing localStorage for ${key}:`, e);
+      }
     }
     // Try file (if available)
     try {
       const file = await universalStorage._readFile();
-      if (file && file[key]) return file[key];
-    } catch {}
+      if (file && file[key]) {
+        console.log(`✅ UniversalStorage.get: Found ${key} in file`);
+        return file[key];
+      }
+    } catch (e) {
+      console.warn(`⚠️ UniversalStorage.get: Error reading file for ${key}:`, e);
+    }
+    console.log(`❌ UniversalStorage.get: ${key} not found`);
     return undefined;
   },
 
   // Set value by key (updates both localStorage and file)
   async set(key: string, value: string) {
+    console.log(`🗄️ UniversalStorage.set: ${key} = ${value.substring(0, 10)}...`);
     // Update localStorage
     let obj: Record<string, string> = {};
     const local = localStorage.getItem(STORAGE_KEY);
@@ -33,6 +46,23 @@ export const universalStorage = {
     }
     obj[key] = value;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+    console.log(`✅ UniversalStorage.set: ${key} saved to localStorage`);
+    // Update file
+    await universalStorage._writeFile(obj);
+  },
+
+  // Remove value by key (updates both localStorage and file)
+  async remove(key: string) {
+    console.log(`🗑️ UniversalStorage.remove: ${key}`);
+    // Update localStorage
+    let obj: Record<string, string> = {};
+    const local = localStorage.getItem(STORAGE_KEY);
+    if (local) {
+      try { obj = JSON.parse(local); } catch {}
+    }
+    delete obj[key];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+    console.log(`✅ UniversalStorage.remove: ${key} removed from localStorage`);
     // Update file
     await universalStorage._writeFile(obj);
   },

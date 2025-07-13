@@ -36,6 +36,88 @@ const CoverLetterRenderer: React.FC<CoverLetterRendererProps> = ({ content, clas
     );
   }
 
+  // Check if content is in a non-English language or doesn't match expected patterns
+  const isNonEnglishOrUnstructured = (text: string): boolean => {
+    // Check for Japanese characters
+    if (text.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/)) return true;
+
+    // Check for Spanish characters
+    if (text.match(/[ñáéíóúü]/i)) return true;
+
+    // Check for French characters
+    if (text.match(/[àâäéèêëïîôöùûüÿç]/i)) return true;
+
+    // Check for German characters
+    if (text.match(/[äöüß]/i)) return true;
+
+    // Check if it lacks standard English cover letter patterns
+    const hasEnglishPatterns = text.match(/\b(dear|sincerely|regards|yours|hiring manager|position|application)\b/i);
+    if (!hasEnglishPatterns) return true;
+
+    return false;
+  };
+
+  // If content is non-English or unstructured, display it as-is with basic formatting
+  if (isNonEnglishOrUnstructured(content)) {
+    return (
+      <div className={`cover-letter-content ${className} max-w-4xl mx-auto bg-white p-8 shadow-lg`}>
+        <div className="whitespace-pre-wrap text-sm leading-relaxed">
+          {content.split('\n').map((line, index) => {
+            const trimmedLine = line.trim();
+
+            // Style different types of lines
+            if (!trimmedLine) {
+              return <br key={index} />;
+            }
+
+            // Date (usually at the top)
+            if (trimmedLine.match(/^\d{4}年\d{1,2}月\d{1,2}日$|^\d{1,2}\/\d{1,2}\/\d{4}$|^\d{4}-\d{2}-\d{2}$/)) {
+              return (
+                <div key={index} className="text-right mb-4 text-gray-600">
+                  {trimmedLine}
+                </div>
+              );
+            }
+
+            // Salutation (Dear, 拝啓, etc.)
+            if (trimmedLine.match(/^(dear|拝啓|estimado|cher|lieber)/i)) {
+              return (
+                <div key={index} className="mb-4 font-medium">
+                  {trimmedLine}
+                </div>
+              );
+            }
+
+            // Closing (Sincerely, 敬具, etc.)
+            if (trimmedLine.match(/^(sincerely|regards|敬具|atentamente|cordialement|mit freundlichen grüßen)/i)) {
+              return (
+                <div key={index} className="mt-6 mb-2 font-medium">
+                  {trimmedLine}
+                </div>
+              );
+            }
+
+            // Contact info (emails, phones, URLs)
+            if (trimmedLine.match(/@|http|linkedin|github|tel:|phone:|email:|\+\d+/i)) {
+              return (
+                <div key={index} className="text-blue-600 mb-1">
+                  {trimmedLine}
+                </div>
+              );
+            }
+
+            // Regular paragraphs
+            return (
+              <div key={index} className="mb-3 text-justify">
+                {trimmedLine}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   // Key technologies and professional keywords for highlighting
   const keyTechnologies = [
     'java', 'spring', 'boot', 'microservices', 'rest', 'api', 'mongodb', 'postgresql',

@@ -38,6 +38,98 @@ const ResumeRenderer: React.FC<ResumeRendererProps> = ({ content, className = ""
     );
   }
 
+  // Check if content is in a non-English language or doesn't match expected patterns
+  const isNonEnglishOrUnstructured = (text: string): boolean => {
+    // Check for Japanese characters
+    if (text.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/)) return true;
+
+    // Check for Spanish characters
+    if (text.match(/[ñáéíóúü]/i)) return true;
+
+    // Check for French characters
+    if (text.match(/[àâäéèêëïîôöùûüÿç]/i)) return true;
+
+    // Check for German characters
+    if (text.match(/[äöüß]/i)) return true;
+
+    // Check if it lacks standard English section headers
+    const hasEnglishSections = text.match(/\b(EDUCATION|SKILLS|EXPERIENCE|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE)\b/i);
+    if (!hasEnglishSections) return true;
+
+    return false;
+  };
+
+  // If content is non-English or unstructured, display it as-is with basic formatting
+  if (isNonEnglishOrUnstructured(content)) {
+    return (
+      <div className={`resume-content ${className} max-w-4xl mx-auto bg-white p-8 shadow-lg`}>
+        <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed">
+          {content.split('\n').map((line, index) => {
+            const trimmedLine = line.trim();
+
+            // Style different types of lines
+            if (!trimmedLine) {
+              return <br key={index} />;
+            }
+
+            // Headers (all caps or specific patterns)
+            if (trimmedLine.match(/^[A-Z\s]{3,}$/) ||
+                trimmedLine.match(/^(個人情報|職歴要約|技術スキル|職歴|学歴|資格|INFORMACIÓN PERSONAL|RESUMEN PROFESIONAL|COMPETENCIAS TÉCNICAS|EXPERIENCIA LABORAL|FORMACIÓN|IDIOMAS|INFORMATIONS PERSONNELLES|PROFIL PROFESSIONNEL|COMPÉTENCES TECHNIQUES|EXPÉRIENCE PROFESSIONNELLE|FORMATION|LANGUES|PERSÖNLICHE DATEN|BERUFSPROFIL|TECHNISCHE FÄHIGKEITEN|BERUFSERFAHRUNG|AUSBILDUNG|ZERTIFIZIERUNGEN)$/)) {
+              return (
+                <div key={index} className="font-bold text-lg mt-6 mb-3 text-blue-900 border-b border-gray-300 pb-1">
+                  {trimmedLine}
+                </div>
+              );
+            }
+
+            // Name (first line, typically)
+            if (index === 0 && trimmedLine.match(/^[A-Z\s]+$|^[A-Za-z\s]+$/)) {
+              return (
+                <div key={index} className="font-bold text-2xl mb-2 text-center text-gray-900">
+                  {trimmedLine}
+                </div>
+              );
+            }
+
+            // Contact info (emails, phones, URLs)
+            if (trimmedLine.match(/@|http|linkedin|github|tel:|phone:|email:|\+\d+/i)) {
+              return (
+                <div key={index} className="text-blue-600 text-center mb-1">
+                  {trimmedLine}
+                </div>
+              );
+            }
+
+            // Bullet points
+            if (trimmedLine.match(/^[•·-]\s/)) {
+              return (
+                <div key={index} className="ml-4 mb-1">
+                  {trimmedLine}
+                </div>
+              );
+            }
+
+            // Job titles or positions (contains | or dates)
+            if (trimmedLine.match(/\||\d{4}/) && trimmedLine.length > 10) {
+              return (
+                <div key={index} className="font-semibold mt-3 mb-1 text-gray-800">
+                  {trimmedLine}
+                </div>
+              );
+            }
+
+            // Regular content
+            return (
+              <div key={index} className="mb-1">
+                {trimmedLine}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   const parseResumeToStructure = (text: string): ResumeData => {
     const lines = text.split('\n').map(line => line.trim()).filter(line => line);
 
@@ -107,7 +199,6 @@ const ResumeRenderer: React.FC<ResumeRendererProps> = ({ content, className = ""
           case 'social':
             resumeData.leftColumn.links.push(line);
             break;
-          case 'coursework':
           case 'coursework':
             resumeData.leftColumn.coursework.push(line);
             break;

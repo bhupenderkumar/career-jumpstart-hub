@@ -9,22 +9,22 @@ import {
   FileTextIcon,
   MailIcon,
   FileIcon,
-  DownloadIcon,
   SparklesIcon,
   CheckCircleIcon,
   BriefcaseIcon,
   EditIcon,
   RefreshCwIcon,
-  PrinterIcon
+  PrinterIcon,
+  DownloadIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
 import ResumeRenderer from "@/components/ResumeRenderer";
 import CoverLetterRenderer from "@/components/CoverLetterRenderer";
-import PDFPreview from "@/components/PDFPreview";
-import { generateCleanPDF } from "@/utils/cleanPDFGenerator";
+import EnhancedPrintManager from "@/components/EnhancedPrintManager";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
 import { createCleanPrintWindow } from "@/utils/printUtils";
+import { downloadResumeAsPDF, downloadCoverLetterAsPDF, downloadEmailAsPDF, testPDFGeneration } from "@/utils/resumeDownloader";
 
 interface DocumentGeneratorProps {
   jobDescription: string;
@@ -45,7 +45,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
   const [enhancementPrompt, setEnhancementPrompt] = useState("");
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [showPWAPrompt, setShowPWAPrompt] = useState(false);
-  const [downloadInfo, setDownloadInfo] = useState<{type: 'resume' | 'cover-letter' | 'email', fileName?: string}>({type: 'resume'});
+
   const { toast } = useToast();
 
   const handleGenerateAll = async () => {
@@ -64,16 +64,47 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       console.log('📝 Job description length:', jobDescription.length);
       console.log('📄 Base resume provided:', !!baseResume);
 
+      // Show language selection in toast
+      const languageNames = {
+        'en': 'English',
+        'ja': 'Japanese',
+        'es': 'Spanish',
+        'fr': 'French',
+        'de': 'German'
+      };
+
+      toast({
+        title: "Generating Documents",
+        description: `Creating documents in ${languageNames[language as keyof typeof languageNames] || language} for ${country} market...`,
+      });
+
       const result = await generateAllDocuments({
         jobDescription,
         baseResume,
         language,
         country,
-        generateType: 'all'
+        generateType: 'all',
+        onModelChange: (modelName, documentType) => {
+          toast({
+            title: "Trying Different AI Model",
+            description: `Using ${modelName} for ${documentType} generation...`,
+            duration: 2000,
+          });
+        }
       });
 
       console.log('✅ Documents generated successfully for language:', language);
       console.log('📊 Result keys:', Object.keys(result));
+
+      // Debug: Log the actual content being set
+      if (result.resume) {
+        console.log('📄 Resume content length:', result.resume.length);
+        console.log('📄 Resume preview (first 500 chars):', result.resume.substring(0, 500));
+      }
+      if (result.coverLetter) {
+        console.log('📄 Cover letter content length:', result.coverLetter.length);
+        console.log('📄 Cover letter preview (first 200 chars):', result.coverLetter.substring(0, 200));
+      }
 
       setDocuments(result);
 
@@ -86,9 +117,28 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       });
     } catch (error) {
       console.error('Document generation error:', error);
+
+      let errorTitle = "Generation Error";
+      let errorDescription = "Failed to generate documents. Please try again.";
+
+      if (error instanceof Error) {
+        if (error.message.includes('503') || error.message.includes('overloaded') || error.message.includes('UNAVAILABLE')) {
+          errorTitle = "AI Service Overloaded";
+          errorDescription = "All AI models are currently overloaded. Please try again in a few minutes.";
+        } else if (error.message.includes('API key')) {
+          errorTitle = "API Key Error";
+          errorDescription = "Please check your Gemini API key configuration.";
+        } else if (error.message.includes('All Gemini models failed')) {
+          errorTitle = "AI Service Unavailable";
+          errorDescription = "All AI models are currently unavailable. Please try again later.";
+        } else {
+          errorDescription = error.message;
+        }
+      }
+
       toast({
-        title: "Generation Error",
-        description: "Failed to generate documents. Please try again.",
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive",
       });
     } finally {
@@ -123,7 +173,14 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
         editPrompt: enhancementPrompt,
         language,
         country,
-        generateType: 'all'
+        generateType: 'all',
+        onModelChange: (modelName, documentType) => {
+          toast({
+            title: "Trying Different AI Model",
+            description: `Using ${modelName} for ${documentType} enhancement...`,
+            duration: 2000,
+          });
+        }
       });
 
       setDocuments(result);
@@ -144,87 +201,9 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
   };
 
-  const handleDownloadPDF = () => {
-    if (!documents.resume) {
-      toast({
-        title: "No Resume",
-        description: "Please generate documents first.",
-        variant: "destructive",
-      });
-      return;
-    }
 
-    try {
-      const pdfBlob = generateCleanPDF({
-        content: documents.resume,
-        type: 'resume'
-      });
 
-      // Generate a clean filename
-      const fileName = `resume_${new Date().toISOString().split('T')[0]}.pdf`;
 
-      // Create download link
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "Resume Downloaded",
-        description: "Clean, professional PDF resume has been downloaded successfully!",
-      });
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast({
-        title: "Download Error",
-        description: "Failed to generate PDF. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDownloadCoverLetterPDF = () => {
-    if (!documents.coverLetter) {
-      toast({
-        title: "No Cover Letter",
-        description: "Please generate documents first.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const pdfBlob = generateCleanPDF({
-        content: documents.coverLetter,
-        type: 'cover-letter'
-      });
-
-      // Generate a clean filename
-      const fileName = `cover_letter_${new Date().toISOString().split('T')[0]}.pdf`;
-
-      // Create download link
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "Cover Letter Downloaded",
-        description: "Clean, professional PDF cover letter has been downloaded successfully!",
-      });
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast({
-        title: "Download Error",
-        description: "Failed to generate PDF. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handlePrintDocument = async (type: 'resume' | 'cover-letter' | 'email') => {
     const content = type === 'resume' ? documents.resume :
@@ -276,6 +255,92 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     });
   };
 
+  const handleDownloadResume = async () => {
+    if (!documents.resume) {
+      toast({
+        title: "No Resume Available",
+        description: "Please generate a resume first before downloading.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      console.log('🚀 Starting resume download with exact UI matching...');
+      console.log('📄 Resume content type:', typeof documents.resume);
+      console.log('📄 Resume content length:', documents.resume?.length || 0);
+      console.log('📄 Resume content preview:', documents.resume?.substring(0, 200) || 'No content');
+
+      await downloadResumeAsPDF(documents.resume);
+
+      toast({
+        title: "Professional Resume Downloaded!",
+        description: "Your resume has been saved as a full-size professional PDF with proper Deedy CV formatting and ATS-friendly layout.",
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download Error",
+        description: error instanceof Error ? error.message : "Failed to download resume. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadCoverLetter = async () => {
+    if (!documents.coverLetter) {
+      toast({
+        title: "No Cover Letter Available",
+        description: "Please generate a cover letter first before downloading.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      downloadCoverLetterAsPDF(documents.coverLetter);
+
+      toast({
+        title: "Cover Letter Downloaded Successfully!",
+        description: "Your professional cover letter has been saved as a PDF with matching formatting.",
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download Error",
+        description: error instanceof Error ? error.message : "Failed to download cover letter. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadEmail = async () => {
+    if (!documents.email) {
+      toast({
+        title: "No Email Template Available",
+        description: "Please generate an email template first before downloading.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      downloadEmailAsPDF(documents.email);
+
+      toast({
+        title: "Email Template Downloaded Successfully!",
+        description: "Your professional email template has been saved as a PDF with clean formatting.",
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download Error",
+        description: error instanceof Error ? error.message : "Failed to download email template. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Save application to localStorage for tracking
   const saveApplicationToStorage = (documents: any) => {
     try {
@@ -284,31 +349,68 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       let jobTitle = 'Unknown Position';
       let company = 'Unknown Company';
 
-      // Try to extract job title (usually in first few lines)
-      for (const line of jobLines.slice(0, 5)) {
-        if (line.toLowerCase().includes('position') ||
-            line.toLowerCase().includes('role') ||
-            line.toLowerCase().includes('job title') ||
-            line.toLowerCase().includes('we are looking for') ||
-            line.toLowerCase().includes('seeking')) {
-          jobTitle = line.replace(/[^\w\s]/g, '').trim().substring(0, 50);
+      // Enhanced job title extraction
+      for (let i = 0; i < Math.min(jobLines.length, 10); i++) {
+        const line = jobLines[i];
+
+        // Look for common job title patterns
+        const titleMatch = line.match(/^(job title|position|role|we are looking for|seeking|hiring|opening for)[:]\s*(.+)/i);
+        if (titleMatch) {
+          jobTitle = titleMatch[2].trim().substring(0, 50);
           break;
         }
-      }
 
-      // Try to extract company name
-      for (const line of jobLines.slice(0, 10)) {
-        if (line.toLowerCase().includes('company') ||
-            line.toLowerCase().includes('about us') ||
-            line.toLowerCase().includes('join') ||
-            line.toLowerCase().includes('at ')) {
-          const companyMatch = line.match(/(?:at|join|company:?\s*)([A-Z][a-zA-Z\s&.,'-]+?)(?:\s|,|\.|\n|$)/i);
-          if (companyMatch) {
-            company = companyMatch[1].trim().substring(0, 30);
+        // Look for job titles in headers or emphasized text
+        if (line.match(/^([A-Z][a-zA-Z\s]+(?:Engineer|Developer|Manager|Analyst|Specialist|Coordinator|Director|Consultant|Designer|Architect|Scientist|Lead|Senior|Principal|Associate|Executive))$/i)) {
+          jobTitle = line.trim().substring(0, 50);
+          break;
+        }
+
+        // Look for "The Role" or similar patterns
+        if (line.toLowerCase().includes('the role') && jobLines[i + 1]) {
+          const nextLine = jobLines[i + 1];
+          if (nextLine.match(/^[A-Z][a-zA-Z\s]+/)) {
+            jobTitle = nextLine.trim().substring(0, 50);
             break;
           }
         }
       }
+
+      // Enhanced company name extraction
+      for (let i = 0; i < Math.min(jobLines.length, 15); i++) {
+        const line = jobLines[i];
+
+        // Look for company name at the beginning (common in job postings)
+        let companyMatch = i < 3 ? line.match(/^([A-Z][a-zA-Z\s&.,'-]{2,30})(?:\s+is|,|\s*-|\s+seeks|\s+looking)/i) : null;
+        if (companyMatch) {
+          company = companyMatch[1].trim().substring(0, 30);
+          break;
+        }
+
+        // Look for "About [Company]" or "Join [Company]" patterns
+        companyMatch = line.match(/(?:about|join|at)\s+([A-Z][a-zA-Z\s&.,'-]{2,30})(?:\s|,|\.|\n|$)/i);
+        if (companyMatch) {
+          company = companyMatch[1].trim().substring(0, 30);
+          break;
+        }
+
+        // Look for company in context like "Company: Name" or "Organization: Name"
+        companyMatch = line.match(/(?:company|organization|employer)[:]\s*([A-Z][a-zA-Z\s&.,'-]{2,30})/i);
+        if (companyMatch) {
+          company = companyMatch[1].trim().substring(0, 30);
+          break;
+        }
+
+        // Look for "We are" or "Our company" patterns
+        companyMatch = line.match(/(?:we are|our company is|our team at)\s+([A-Z][a-zA-Z\s&.,'-]{2,30})/i);
+        if (companyMatch) {
+          company = companyMatch[1].trim().substring(0, 30);
+          break;
+        }
+      }
+
+      console.log(`📋 Extracted: Job Title: "${jobTitle}", Company: "${company}"`);
+      console.log(`📋 From job description preview: ${jobDescription.substring(0, 200)}...`);
 
       // Create application object
       const application = {
@@ -359,6 +461,14 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
           >
             <SparklesIcon className="w-4 h-4 mr-2" />
             {isGenerating ? "Generating..." : "Generate All Documents"}
+          </Button>
+          <Button
+            onClick={() => testPDFGeneration()}
+            variant="outline"
+            size="sm"
+            className="ml-2"
+          >
+            Test PDF
           </Button>
         </div>
         <div className="space-y-2">
@@ -415,16 +525,24 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
             </CardContent>
           </Card>
         )}
+
+        {/* Enhanced Print Manager */}
+        {Object.keys(documents).length > 0 && (
+          <div className="mb-6">
+            <EnhancedPrintManager
+              documents={documents}
+              language={language}
+              country={country}
+            />
+          </div>
+        )}
+
         {Object.keys(documents).length > 0 ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="resume" className="flex items-center gap-2">
                 <FileTextIcon className="w-4 h-4" />
                 Resume
-              </TabsTrigger>
-              <TabsTrigger value="pdf" className="flex items-center gap-2">
-                <DownloadIcon className="w-4 h-4" />
-                PDF Preview
               </TabsTrigger>
               <TabsTrigger value="cover-letter" className="flex items-center gap-2">
                 <FileIcon className="w-4 h-4" />
@@ -460,12 +578,13 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={handleDownloadPDF}
+                      onClick={() => handleDownloadResume()}
                       className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
                     >
                       <DownloadIcon className="w-3 h-3 mr-1" />
-                      PDF
+                      Download PDF
                     </Button>
+
                   </div>
                 </div>
                 <div className="border rounded-lg p-4 bg-white max-h-[600px] overflow-y-auto">
@@ -474,14 +593,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
               </div>
             </TabsContent>
 
-            <TabsContent value="pdf" className="mt-4">
-              <PDFPreview
-                resume={documents.resume || ''}
-                language={language}
-                country={country}
-                onDownload={handleDownloadPDF}
-              />
-            </TabsContent>
+
 
             <TabsContent value="cover-letter" className="mt-4">
               <div className="space-y-4">
@@ -507,12 +619,13 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={handleDownloadCoverLetterPDF}
+                      onClick={() => handleDownloadCoverLetter()}
                       className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
                     >
                       <DownloadIcon className="w-3 h-3 mr-1" />
-                      PDF
+                      Download PDF
                     </Button>
+
                     <Badge className="bg-blue-100 text-blue-800">
                       <CheckCircleIcon className="w-3 h-3 mr-1" />
                       {country} Format
@@ -545,6 +658,15 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                     >
                       <PrinterIcon className="w-3 h-3 mr-1" />
                       Print
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadEmail()}
+                      className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
+                    >
+                      <DownloadIcon className="w-3 h-3 mr-1" />
+                      Download PDF
                     </Button>
                     <Badge className="bg-purple-100 text-purple-800">
                       <CheckCircleIcon className="w-3 h-3 mr-1" />
@@ -597,8 +719,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       <PWADownloadPrompt
         show={showPWAPrompt}
         onClose={() => setShowPWAPrompt(false)}
-        downloadType={downloadInfo.type}
-        fileName={downloadInfo.fileName}
+        downloadType="resume"
+        fileName="resume.pdf"
       />
     </Card>
   );

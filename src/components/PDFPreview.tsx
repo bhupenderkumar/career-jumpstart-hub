@@ -13,7 +13,7 @@ interface PDFPreviewProps {
   resume: string;
   language: string;
   country: string;
-  onDownload: () => void;
+  onDownload?: () => void;
 }
 
 const PDFPreview: React.FC<PDFPreviewProps> = ({ resume, language, country, onDownload }) => {
@@ -156,20 +156,22 @@ const PDFPreview: React.FC<PDFPreviewProps> = ({ resume, language, country, onDo
               </div>
             </div>
 
-            {/* Download Button */}
-            <div className="text-center">
-              <Button
-                onClick={onDownload}
-                size="lg"
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                <DownloadIcon className="w-5 h-5 mr-2" />
-                Download Professional PDF
-              </Button>
-              <p className="text-sm text-gray-600 mt-2">
-                Click to download your ATS-optimized resume
-              </p>
-            </div>
+            {/* Download Button - Only show if onDownload is provided */}
+            {onDownload && (
+              <div className="text-center">
+                <Button
+                  onClick={onDownload}
+                  size="lg"
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                >
+                  <DownloadIcon className="w-5 h-5 mr-2" />
+                  Download Professional PDF
+                </Button>
+                <p className="text-sm text-gray-600 mt-2">
+                  Click to download your ATS-optimized resume
+                </p>
+              </div>
+            )}
 
             {/* Resume Preview */}
             <Card className="bg-white border border-gray-200">

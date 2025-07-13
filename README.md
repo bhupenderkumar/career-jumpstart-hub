@@ -6,10 +6,10 @@ Welcome to Career Jumpstart Hub - your AI-powered career companion! This platfor
 
 - **AI Resume Generator**: Create personalized resumes tailored to specific job descriptions using Google Gemini AI
 - **Resume Upload & Parsing**: Upload existing resumes in PDF or text format
-- **Application Tracking**: Keep track of your job applications and their status
-- **Location Management**: Organize job opportunities by location
-- **Export Options**: Download your generated resumes as PDF files
+- **Application Tracking**: Simple application tracking to manage your resume versions
+- **Export Options**: Download your generated resumes as PDF files with ATS optimization
 - **Smart Editing**: Use AI to make specific improvements to your resume
+- **Multi-language Support**: Generate resumes in different languages and formats
 
 ## Getting Started
 
