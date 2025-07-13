@@ -14,7 +14,8 @@ import {
   BriefcaseIcon,
   EditIcon,
   RefreshCwIcon,
-  PrinterIcon
+  PrinterIcon,
+  DownloadIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
@@ -23,6 +24,7 @@ import CoverLetterRenderer from "@/components/CoverLetterRenderer";
 import EnhancedPrintManager from "@/components/EnhancedPrintManager";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
 import { createCleanPrintWindow } from "@/utils/printUtils";
+import { downloadResumeAsPDF, downloadCoverLetterAsPDF, downloadEmailAsPDF, testPDFGeneration } from "@/utils/resumeDownloader";
 
 interface DocumentGeneratorProps {
   jobDescription: string;
@@ -243,6 +245,92 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     });
   };
 
+  const handleDownloadResume = async () => {
+    if (!documents.resume) {
+      toast({
+        title: "No Resume Available",
+        description: "Please generate a resume first before downloading.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      console.log('🚀 Starting resume download with exact UI matching...');
+      console.log('📄 Resume content type:', typeof documents.resume);
+      console.log('📄 Resume content length:', documents.resume?.length || 0);
+      console.log('📄 Resume content preview:', documents.resume?.substring(0, 200) || 'No content');
+
+      await downloadResumeAsPDF(documents.resume);
+
+      toast({
+        title: "Professional Resume Downloaded!",
+        description: "Your resume has been saved as a full-size professional PDF with proper Deedy CV formatting and ATS-friendly layout.",
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download Error",
+        description: error instanceof Error ? error.message : "Failed to download resume. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadCoverLetter = async () => {
+    if (!documents.coverLetter) {
+      toast({
+        title: "No Cover Letter Available",
+        description: "Please generate a cover letter first before downloading.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      downloadCoverLetterAsPDF(documents.coverLetter);
+
+      toast({
+        title: "Cover Letter Downloaded Successfully!",
+        description: "Your professional cover letter has been saved as a PDF with matching formatting.",
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download Error",
+        description: error instanceof Error ? error.message : "Failed to download cover letter. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadEmail = async () => {
+    if (!documents.email) {
+      toast({
+        title: "No Email Template Available",
+        description: "Please generate an email template first before downloading.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      downloadEmailAsPDF(documents.email);
+
+      toast({
+        title: "Email Template Downloaded Successfully!",
+        description: "Your professional email template has been saved as a PDF with clean formatting.",
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download Error",
+        description: error instanceof Error ? error.message : "Failed to download email template. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Save application to localStorage for tracking
   const saveApplicationToStorage = (documents: any) => {
     try {
@@ -326,6 +414,14 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
           >
             <SparklesIcon className="w-4 h-4 mr-2" />
             {isGenerating ? "Generating..." : "Generate All Documents"}
+          </Button>
+          <Button
+            onClick={() => testPDFGeneration()}
+            variant="outline"
+            size="sm"
+            className="ml-2"
+          >
+            Test PDF
           </Button>
         </div>
         <div className="space-y-2">
@@ -432,6 +528,15 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                       <PrinterIcon className="w-3 h-3 mr-1" />
                       Print
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadResume()}
+                      className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
+                    >
+                      <DownloadIcon className="w-3 h-3 mr-1" />
+                      Download PDF
+                    </Button>
 
                   </div>
                 </div>
@@ -463,6 +568,15 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                     >
                       <PrinterIcon className="w-3 h-3 mr-1" />
                       Print
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadCoverLetter()}
+                      className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
+                    >
+                      <DownloadIcon className="w-3 h-3 mr-1" />
+                      Download PDF
                     </Button>
 
                     <Badge className="bg-blue-100 text-blue-800">
@@ -497,6 +611,15 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                     >
                       <PrinterIcon className="w-3 h-3 mr-1" />
                       Print
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadEmail()}
+                      className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
+                    >
+                      <DownloadIcon className="w-3 h-3 mr-1" />
+                      Download PDF
                     </Button>
                     <Badge className="bg-purple-100 text-purple-800">
                       <CheckCircleIcon className="w-3 h-3 mr-1" />
