@@ -556,7 +556,7 @@ The date should be formatted according to ${country} standards.
 
 **STRUCTURE:**
 1. Header: Realistic contact information.
-2. Date: Use today's date (${new Date().toLocaleDateString(language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'ja' ? 'ja-JP' : 'en-US')}).
+2. Date: MUST use today's date: ${new Date().toLocaleDateString(language === 'de' ? 'de-DE' : language === 'fr' ? 'fr-FR' : language === 'es' ? 'es-ES' : language === 'ja' ? 'ja-JP' : 'en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })} (NOT 24.10.2023).
 3. Salutation: "Dear Hiring Manager."
 4. Opening: Express interest in "this position."
 5. Body: Highlight relevant experience.
