@@ -34,6 +34,27 @@ interface ParsedResume {
   };
 }
 
+// Check if content is in a non-English language
+const isNonEnglishContent = (content: string): boolean => {
+  // Check for Japanese characters
+  if (content.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/)) return true;
+
+  // Check for Spanish characters
+  if (content.match(/[ñáéíóúü]/i)) return true;
+
+  // Check for French characters
+  if (content.match(/[àâäéèêëïîôöùûüÿç]/i)) return true;
+
+  // Check for German characters
+  if (content.match(/[äöüß]/i)) return true;
+
+  // Check if it lacks standard English section headers
+  const hasEnglishSections = content.match(/\b(EDUCATION|SKILLS|EXPERIENCE|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE)\b/i);
+  if (!hasEnglishSections) return true;
+
+  return false;
+};
+
 // Parse resume content into structured format
 const parseResumeContent = (content: string): ParsedResume => {
   const lines = content.split('\n').map(line => line.trim()).filter(line => line);
@@ -167,6 +188,89 @@ const cleanText = (text: string): string => {
     .trim();
 };
 
+// Simple PDF generation for non-English content
+const downloadSimpleResumeAsPDF = async (resumeContent: string): Promise<void> => {
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  // A4 dimensions
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const margin = 20;
+  const contentWidth = pageWidth - 2 * margin;
+
+  let yPosition = margin;
+  const lineHeight = 6;
+  const maxLinesPerPage = Math.floor((pageHeight - 2 * margin) / lineHeight);
+  let currentLine = 0;
+
+  // Set font for better Unicode support
+  pdf.setFont('helvetica');
+
+  const lines = resumeContent.split('\n');
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+
+    if (!trimmedLine) {
+      yPosition += lineHeight * 0.5; // Half line for empty lines
+      continue;
+    }
+
+    // Check if we need a new page
+    if (currentLine >= maxLinesPerPage) {
+      pdf.addPage();
+      yPosition = margin;
+      currentLine = 0;
+    }
+
+    // Style different types of content
+    if (trimmedLine.match(/^[A-Z\s]{3,}$/) ||
+        trimmedLine.match(/^(個人情報|職歴要約|技術スキル|職歴|学歴|資格|INFORMACIÓN PERSONAL|RESUMEN PROFESIONAL|COMPETENCIAS TÉCNICAS|EXPERIENCIA LABORAL|FORMACIÓN|IDIOMAS|INFORMATIONS PERSONNELLES|PROFIL PROFESSIONNEL|COMPÉTENCES TECHNIQUES|EXPÉRIENCE PROFESSIONNELLE|FORMATION|LANGUES|PERSÖNLICHE DATEN|BERUFSPROFIL|TECHNISCHE FÄHIGKEITEN|BERUFSERFAHRUNG|AUSBILDUNG|ZERTIFIZIERUNGEN)$/)) {
+      // Section headers
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      yPosition += lineHeight;
+    } else if (trimmedLine.match(/@|http|linkedin|github|tel:|phone:|email:|\+\d+/i)) {
+      // Contact info
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+    } else if (trimmedLine.match(/\||\d{4}/) && trimmedLine.length > 10) {
+      // Job titles or positions
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'bold');
+    } else {
+      // Regular content
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+    }
+
+    // Split long lines to fit page width
+    const splitLines = pdf.splitTextToSize(trimmedLine, contentWidth);
+
+    for (const splitLine of splitLines) {
+      if (currentLine >= maxLinesPerPage) {
+        pdf.addPage();
+        yPosition = margin;
+        currentLine = 0;
+      }
+
+      pdf.text(splitLine, margin, yPosition);
+      yPosition += lineHeight;
+      currentLine++;
+    }
+  }
+
+  // Download the PDF
+  const fileName = `resume_${new Date().toISOString().split('T')[0]}.pdf`;
+  pdf.save(fileName);
+
+  console.log('✅ Simple PDF generated successfully');
+};
+
 // Main PDF generation function - PROFESSIONAL FULL-SIZE OUTPUT
 export const downloadResumeAsPDF = async (resumeContent: string): Promise<void> => {
   try {
@@ -174,6 +278,12 @@ export const downloadResumeAsPDF = async (resumeContent: string): Promise<void> 
 
     if (!resumeContent || resumeContent.trim().length === 0) {
       throw new Error('Resume content is empty or undefined');
+    }
+
+    // Check if content is non-English and use simple layout
+    if (isNonEnglishContent(resumeContent)) {
+      console.log('🌍 Detected non-English content, using simple layout...');
+      return downloadSimpleResumeAsPDF(resumeContent);
     }
 
     const resume = parseResumeContent(resumeContent);

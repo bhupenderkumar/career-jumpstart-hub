@@ -96,6 +96,16 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       console.log('✅ Documents generated successfully for language:', language);
       console.log('📊 Result keys:', Object.keys(result));
 
+      // Debug: Log the actual content being set
+      if (result.resume) {
+        console.log('📄 Resume content length:', result.resume.length);
+        console.log('📄 Resume preview (first 500 chars):', result.resume.substring(0, 500));
+      }
+      if (result.coverLetter) {
+        console.log('📄 Cover letter content length:', result.coverLetter.length);
+        console.log('📄 Cover letter preview (first 200 chars):', result.coverLetter.substring(0, 200));
+      }
+
       setDocuments(result);
 
       // Save application to localStorage for tracking
@@ -339,31 +349,68 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       let jobTitle = 'Unknown Position';
       let company = 'Unknown Company';
 
-      // Try to extract job title (usually in first few lines)
-      for (const line of jobLines.slice(0, 5)) {
-        if (line.toLowerCase().includes('position') ||
-            line.toLowerCase().includes('role') ||
-            line.toLowerCase().includes('job title') ||
-            line.toLowerCase().includes('we are looking for') ||
-            line.toLowerCase().includes('seeking')) {
-          jobTitle = line.replace(/[^\w\s]/g, '').trim().substring(0, 50);
+      // Enhanced job title extraction
+      for (let i = 0; i < Math.min(jobLines.length, 10); i++) {
+        const line = jobLines[i];
+
+        // Look for common job title patterns
+        const titleMatch = line.match(/^(job title|position|role|we are looking for|seeking|hiring|opening for)[:]\s*(.+)/i);
+        if (titleMatch) {
+          jobTitle = titleMatch[2].trim().substring(0, 50);
           break;
         }
-      }
 
-      // Try to extract company name
-      for (const line of jobLines.slice(0, 10)) {
-        if (line.toLowerCase().includes('company') ||
-            line.toLowerCase().includes('about us') ||
-            line.toLowerCase().includes('join') ||
-            line.toLowerCase().includes('at ')) {
-          const companyMatch = line.match(/(?:at|join|company:?\s*)([A-Z][a-zA-Z\s&.,'-]+?)(?:\s|,|\.|\n|$)/i);
-          if (companyMatch) {
-            company = companyMatch[1].trim().substring(0, 30);
+        // Look for job titles in headers or emphasized text
+        if (line.match(/^([A-Z][a-zA-Z\s]+(?:Engineer|Developer|Manager|Analyst|Specialist|Coordinator|Director|Consultant|Designer|Architect|Scientist|Lead|Senior|Principal|Associate|Executive))$/i)) {
+          jobTitle = line.trim().substring(0, 50);
+          break;
+        }
+
+        // Look for "The Role" or similar patterns
+        if (line.toLowerCase().includes('the role') && jobLines[i + 1]) {
+          const nextLine = jobLines[i + 1];
+          if (nextLine.match(/^[A-Z][a-zA-Z\s]+/)) {
+            jobTitle = nextLine.trim().substring(0, 50);
             break;
           }
         }
       }
+
+      // Enhanced company name extraction
+      for (let i = 0; i < Math.min(jobLines.length, 15); i++) {
+        const line = jobLines[i];
+
+        // Look for company name at the beginning (common in job postings)
+        let companyMatch = i < 3 ? line.match(/^([A-Z][a-zA-Z\s&.,'-]{2,30})(?:\s+is|,|\s*-|\s+seeks|\s+looking)/i) : null;
+        if (companyMatch) {
+          company = companyMatch[1].trim().substring(0, 30);
+          break;
+        }
+
+        // Look for "About [Company]" or "Join [Company]" patterns
+        companyMatch = line.match(/(?:about|join|at)\s+([A-Z][a-zA-Z\s&.,'-]{2,30})(?:\s|,|\.|\n|$)/i);
+        if (companyMatch) {
+          company = companyMatch[1].trim().substring(0, 30);
+          break;
+        }
+
+        // Look for company in context like "Company: Name" or "Organization: Name"
+        companyMatch = line.match(/(?:company|organization|employer)[:]\s*([A-Z][a-zA-Z\s&.,'-]{2,30})/i);
+        if (companyMatch) {
+          company = companyMatch[1].trim().substring(0, 30);
+          break;
+        }
+
+        // Look for "We are" or "Our company" patterns
+        companyMatch = line.match(/(?:we are|our company is|our team at)\s+([A-Z][a-zA-Z\s&.,'-]{2,30})/i);
+        if (companyMatch) {
+          company = companyMatch[1].trim().substring(0, 30);
+          break;
+        }
+      }
+
+      console.log(`📋 Extracted: Job Title: "${jobTitle}", Company: "${company}"`);
+      console.log(`📋 From job description preview: ${jobDescription.substring(0, 200)}...`);
 
       // Create application object
       const application = {
