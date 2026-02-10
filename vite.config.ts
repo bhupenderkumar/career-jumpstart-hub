@@ -10,6 +10,11 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     proxy: {
+      '/api/llm': {
+        target: 'http://localhost:9001',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/llm/, '/v1'),
+      },
       '/api/jobs': {
         target: 'https://remoteok.io',
         changeOrigin: true,

@@ -1,89 +1,310 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { calculateATSScore, type ATSScore } from '@/utils/atsResumeGenerator';
 
 interface ResumeRendererProps {
   content?: string;
   className?: string;
+  showATSScore?: boolean;
 }
 
-
-
-interface ResumeData {
-  header: {
-    name: string;
-    title: string;
-    contact: string[];
-  };
-  leftColumn: {
-    education: string[];
-    skills: string[];
-    links: string[];
-    coursework: string[];
-    additional: string[];
-  };
-  rightColumn: {
-    experience: string[];
-    research: string[];
-    awards: string[];
-    publications: string[];
-  };
+interface ParsedSection {
+  type: 'summary' | 'skills' | 'experience' | 'education' | 'certifications' | 'projects' | 'additional';
+  title: string;
+  content: string[];
 }
 
-const ResumeRenderer: React.FC<ResumeRendererProps> = ({ content, className = "" }) => {
-  // Handle undefined or null content
-  if (!content) {
+interface ParsedResume {
+  name: string;
+  title: string;
+  contact: string[];
+  sections: ParsedSection[];
+}
+
+// Clean markdown and special characters
+const cleanText = (text: string): string => {
+  if (!text) return '';
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .replace(/`(.*?)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/#+\s*/g, '')
+    .trim();
+};
+
+// Check if content is non-English
+const isNonEnglish = (text: string): boolean => {
+  // Japanese
+  if (text.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/)) return true;
+  // Other non-ASCII heavy content
+  const nonAsciiRatio = (text.match(/[^\x00-\x7F]/g) || []).length / text.length;
+  return nonAsciiRatio > 0.3;
+};
+
+// Parse resume content into structured data
+const parseResume = (content: string): ParsedResume => {
+  const lines = content.split('\n').map(l => l.trim()).filter(l => l);
+  
+  const resume: ParsedResume = {
+    name: '',
+    title: '',
+    contact: [],
+    sections: []
+  };
+
+  type SectionType = ParsedSection['type'];
+  
+  const sectionKeywords: { [key: string]: SectionType } = {
+    'summary': 'summary',
+    'professional summary': 'summary',
+    'profile': 'summary',
+    'objective': 'summary',
+    'about': 'summary',
+    'skills': 'skills',
+    'technical skills': 'skills',
+    'key skills': 'skills',
+    'core competencies': 'skills',
+    'technologies': 'skills',
+    'experience': 'experience',
+    'work experience': 'experience',
+    'professional experience': 'experience',
+    'employment': 'experience',
+    'employment history': 'experience',
+    'education': 'education',
+    'academic': 'education',
+    'academic background': 'education',
+    'certifications': 'certifications',
+    'certificates': 'certifications',
+    'licenses': 'certifications',
+    'projects': 'projects',
+    'key projects': 'projects',
+    'personal projects': 'projects',
+    'additional': 'additional',
+    'interests': 'additional',
+    'languages': 'additional',
+    'awards': 'additional',
+    'achievements': 'additional',
+    'publications': 'additional',
+    'research': 'additional'
+  };
+
+  // Non-English section headers
+  const nonEnglishSections: { [key: string]: SectionType } = {
+    // Japanese
+    '職歴': 'experience', '経歴': 'experience', '職歴要約': 'summary',
+    'スキル': 'skills', '技術スキル': 'skills',
+    '学歴': 'education', '資格': 'certifications',
+    // Spanish
+    'experiencia': 'experience', 'experiencia laboral': 'experience',
+    'habilidades': 'skills', 'competencias': 'skills',
+    'educación': 'education', 'formación': 'education',
+    // French
+    'expérience': 'experience', 'expérience professionnelle': 'experience',
+    'compétences': 'skills', 'formation': 'education',
+    // German
+    'berufserfahrung': 'experience', 'fähigkeiten': 'skills',
+    'ausbildung': 'education', 'zertifizierungen': 'certifications'
+  };
+
+  let currentSection: ParsedSection | null = null;
+  let inHeader = true;
+
+  const isContactLine = (line: string): boolean => {
+    return !!(
+      line.match(/@[\w.-]+\.\w+/) ||
+      line.match(/\+?\d[\d\s\-()]{7,}/) ||
+      line.match(/linkedin\.com/i) ||
+      line.match(/github\.com/i) ||
+      line.match(/\.(com|org|net|io|dev)/i) ||
+      line.match(/^(email|phone|tel|mobile|linkedin|github|website|portfolio|address|location):/i)
+    );
+  };
+
+  const getSectionType = (line: string): SectionType | null => {
+    const cleanLine = cleanText(line).toLowerCase().replace(/[:\-_]/g, '').trim();
+    
+    // Check English keywords
+    for (const [keyword, type] of Object.entries(sectionKeywords)) {
+      if (cleanLine === keyword || cleanLine.startsWith(keyword + ' ')) {
+        return type;
+      }
+    }
+    
+    // Check non-English keywords
+    for (const [keyword, type] of Object.entries(nonEnglishSections)) {
+      if (cleanLine === keyword || cleanLine.includes(keyword)) {
+        return type;
+      }
+    }
+    
+    // Check for ALL CAPS section headers
+    if (line === line.toUpperCase() && line.length > 3 && line.length < 50) {
+      const upperLine = cleanLine;
+      for (const [keyword, type] of Object.entries(sectionKeywords)) {
+        if (upperLine.includes(keyword)) {
+          return type;
+        }
+      }
+    }
+    
+    return null;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const cleanLine = cleanText(line);
+
+    // Check for section header
+    const sectionType = getSectionType(line);
+    if (sectionType) {
+      if (currentSection && currentSection.content.length > 0) {
+        resume.sections.push(currentSection);
+      }
+      currentSection = {
+        type: sectionType,
+        title: cleanLine.toUpperCase(),
+        content: []
+      };
+      inHeader = false;
+      continue;
+    }
+
+    // Header section (name, title, contact)
+    if (inHeader) {
+      // First meaningful line is likely the name
+      if (!resume.name && cleanLine.length > 2 && cleanLine.length < 60 && !isContactLine(line)) {
+        resume.name = cleanLine;
+        continue;
+      }
+      
+      // Check for job title
+      if (!resume.title && cleanLine.match(/engineer|developer|manager|analyst|designer|architect|scientist|lead|senior|specialist|coordinator|director|consultant|intern|student|professional|associate/i)) {
+        resume.title = cleanLine;
+        continue;
+      }
+      
+      // Contact info
+      if (isContactLine(line)) {
+        resume.contact.push(cleanLine);
+        continue;
+      }
+      
+      // If we've collected enough header info, start sections
+      if (resume.name && (resume.contact.length > 0 || i > 6)) {
+        inHeader = false;
+      }
+    }
+
+    // Add content to current section
+    if (currentSection && cleanLine) {
+      currentSection.content.push(cleanLine);
+    } else if (!inHeader && cleanLine && !currentSection) {
+      // Content without a section header - create a general section
+      currentSection = {
+        type: 'summary',
+        title: 'PROFESSIONAL SUMMARY',
+        content: [cleanLine]
+      };
+    }
+  }
+
+  // Add last section
+  if (currentSection && currentSection.content.length > 0) {
+    resume.sections.push(currentSection);
+  }
+
+  return resume;
+};
+
+// Format content with highlighting
+const formatContent = (text: string): string => {
+  let formatted = text
+    // Bold markdown
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+    // Email
+    .replace(/([\w.-]+@[\w.-]+\.\w+)/g, '<a href="mailto:$1" class="text-blue-600 hover:underline">$1</a>')
+    // URLs
+    .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="text-blue-600 hover:underline">$1</a>');
+  
+  return formatted;
+};
+
+// Get section icon based on type
+const getSectionIcon = (type: ParsedSection['type']): string => {
+  const icons: { [key: string]: string } = {
+    summary: '📋',
+    skills: '🛠️',
+    experience: '💼',
+    education: '🎓',
+    certifications: '🏆',
+    projects: '🚀',
+    additional: '📌'
+  };
+  return icons[type] || '📄';
+};
+
+// Get ATS score color
+const getScoreColor = (score: number): string => {
+  if (score >= 80) return 'text-green-600 bg-green-50 border-green-200';
+  if (score >= 60) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+  return 'text-red-600 bg-red-50 border-red-200';
+};
+
+const ResumeRenderer: React.FC<ResumeRendererProps> = ({ content, className = "", showATSScore = false }) => {
+  // Memoize parsing for performance
+  const { resume, atsScore } = useMemo(() => {
+    if (!content) return { resume: null, atsScore: null };
+    return {
+      resume: parseResume(content),
+      atsScore: showATSScore ? calculateATSScore(content) : null
+    };
+  }, [content, showATSScore]);
+
+  // Handle empty content
+  if (!content || !resume) {
     return (
       <div className={`resume-content ${className}`}>
-        <p className="text-gray-500 text-center py-8">No resume content available</p>
+        <div className="text-center py-12 text-gray-500">
+          <div className="text-4xl mb-4">📄</div>
+          <p className="text-lg font-medium">No resume content available</p>
+          <p className="text-sm mt-2">Generate a resume to see the preview</p>
+        </div>
       </div>
     );
   }
 
-  // Check if content is in a non-English language or doesn't match expected patterns
-  const isNonEnglishOrUnstructured = (text: string): boolean => {
-    // Check for Japanese characters
-    if (text.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/)) return true;
-
-    // Check for Spanish characters
-    if (text.match(/[ñáéíóúü]/i)) return true;
-
-    // Check for French characters
-    if (text.match(/[àâäéèêëïîôöùûüÿç]/i)) return true;
-
-    // Check for German characters
-    if (text.match(/[äöüß]/i)) return true;
-
-    // Check if it lacks standard English section headers
-    const hasEnglishSections = text.match(/\b(EDUCATION|SKILLS|EXPERIENCE|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE)\b/i);
-    if (!hasEnglishSections) return true;
-
-    return false;
-  };
-
-  // If content is non-English or unstructured, display it as-is with basic formatting
-  if (isNonEnglishOrUnstructured(content)) {
+  // Check if content is primarily non-English - use simple renderer
+  if (isNonEnglish(content)) {
     return (
-      <div className={`resume-content ${className} max-w-4xl mx-auto bg-white p-8 shadow-lg`}>
-        <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed">
+      <div className={`resume-content ${className} max-w-4xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-8`}>
+        {/* ATS Score Badge */}
+        {atsScore && (
+          <div className={`mb-6 p-4 rounded-lg border ${getScoreColor(atsScore.overall)}`}>
+            <div className="flex items-center justify-between">
+              <span className="font-semibold">ATS Score</span>
+              <span className="text-2xl font-bold">{atsScore.overall}%</span>
+            </div>
+          </div>
+        )}
+        
+        <div className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
           {content.split('\n').map((line, index) => {
             const trimmedLine = line.trim();
+            if (!trimmedLine) return <br key={index} />;
 
-            // Style different types of lines
-            if (!trimmedLine) {
-              return <br key={index} />;
-            }
-
-            // Headers (all caps or specific patterns)
-            if (trimmedLine.match(/^[A-Z\s]{3,}$/) ||
-                trimmedLine.match(/^(個人情報|職歴要約|技術スキル|職歴|学歴|資格|INFORMACIÓN PERSONAL|RESUMEN PROFESIONAL|COMPETENCIAS TÉCNICAS|EXPERIENCIA LABORAL|FORMACIÓN|IDIOMAS|INFORMATIONS PERSONNELLES|PROFIL PROFESSIONNEL|COMPÉTENCES TECHNIQUES|EXPÉRIENCE PROFESSIONNELLE|FORMATION|LANGUES|PERSÖNLICHE DATEN|BERUFSPROFIL|TECHNISCHE FÄHIGKEITEN|BERUFSERFAHRUNG|AUSBILDUNG|ZERTIFIZIERUNGEN)$/)) {
+            // Section headers
+            if (trimmedLine.match(/^[A-Z\s]{4,}$/) || trimmedLine.match(/^(個人情報|職歴要約|技術スキル|職歴|学歴|資格|INFORMACIÓN PERSONAL|RESUMEN PROFESIONAL|COMPETENCIAS TÉCNICAS|EXPERIENCIA LABORAL|FORMACIÓN|IDIOMAS|INFORMATIONS PERSONNELLES|PROFIL PROFESSIONNEL|COMPÉTENCES TECHNIQUES|EXPÉRIENCE PROFESSIONNELLE|FORMATION|LANGUES|PERSÖNLICHE DATEN|BERUFSPROFIL|TECHNISCHE FÄHIGKEITEN|BERUFSERFAHRUNG|AUSBILDUNG|ZERTIFIZIERUNGEN)$/)) {
               return (
-                <div key={index} className="font-bold text-lg mt-6 mb-3 text-blue-900 border-b border-gray-300 pb-1">
+                <div key={index} className="font-bold text-lg mt-6 mb-3 text-blue-900 border-b-2 border-blue-200 pb-2">
                   {trimmedLine}
                 </div>
               );
             }
 
-            // Name (first line, typically)
-            if (index === 0 && trimmedLine.match(/^[A-Z\s]+$|^[A-Za-z\s]+$/)) {
+            // Name (first line)
+            if (index === 0) {
               return (
                 <div key={index} className="font-bold text-2xl mb-2 text-center text-gray-900">
                   {trimmedLine}
@@ -91,503 +312,190 @@ const ResumeRenderer: React.FC<ResumeRendererProps> = ({ content, className = ""
               );
             }
 
-            // Contact info (emails, phones, URLs)
+            // Contact info
             if (trimmedLine.match(/@|http|linkedin|github|tel:|phone:|email:|\+\d+/i)) {
               return (
-                <div key={index} className="text-blue-600 text-center mb-1">
+                <div key={index} className="text-blue-600 text-center mb-1 text-sm">
                   {trimmedLine}
                 </div>
               );
             }
 
             // Bullet points
-            if (trimmedLine.match(/^[•·-]\s/)) {
+            if (trimmedLine.match(/^[•·\-]\s/)) {
               return (
-                <div key={index} className="ml-4 mb-1">
+                <div key={index} className="ml-6 mb-2 flex items-start">
+                  <span className="text-blue-500 mr-2">•</span>
+                  <span>{trimmedLine.replace(/^[•·\-]\s*/, '')}</span>
+                </div>
+              );
+            }
+
+            // Job entries with dates
+            if (trimmedLine.match(/\|.*\d{4}/) || trimmedLine.match(/\d{4}\s*[-–]\s*(present|\d{4})/i)) {
+              return (
+                <div key={index} className="font-semibold mt-4 mb-2 text-gray-800">
                   {trimmedLine}
                 </div>
               );
             }
 
-            // Job titles or positions (contains | or dates)
-            if (trimmedLine.match(/\||\d{4}/) && trimmedLine.length > 10) {
-              return (
-                <div key={index} className="font-semibold mt-3 mb-1 text-gray-800">
-                  {trimmedLine}
-                </div>
-              );
-            }
-
-            // Regular content
-            return (
-              <div key={index} className="mb-1">
-                {trimmedLine}
-              </div>
-            );
+            return <div key={index} className="mb-1">{trimmedLine}</div>;
           })}
         </div>
       </div>
     );
   }
 
-  const parseResumeToStructure = (text: string): ResumeData => {
-    const lines = text.split('\n').map(line => line.trim()).filter(line => line);
-
-    const resumeData: ResumeData = {
-      header: { name: '', title: '', contact: [] },
-      leftColumn: { education: [], skills: [], links: [], coursework: [], additional: [] },
-      rightColumn: { experience: [], research: [], awards: [], publications: [] }
-    };
-
-    let currentSection = '';
-    let isHeaderSection = true;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      // Detect name (usually first line, all caps or title case)
-      if (i === 0 && (line.match(/^[A-Z\s]+$/) || line.match(/^[A-Z][a-z\s]+$/))) {
-        resumeData.header.name = line;
-        continue;
-      }
-
-      // Detect title/role (second line, contains job-related keywords)
-      if (i === 1 && line.match(/engineer|developer|manager|analyst|specialist|coordinator|director|consultant|designer|architect|scientist|researcher|lead|senior|principal|intern|associate|executive/i)) {
-        resumeData.header.title = line;
-        continue;
-      }
-
-      // Detect contact info (more comprehensive patterns)
-      if (isHeaderSection && (
-        line.match(/@|phone:|email:|linkedin:|github:|location:|tel:|www\.|http|portfolio:|website:/i) ||
-        line.match(/^\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/) ||
-        line.match(/^(phone|email|linkedin|github|location|address|website|portfolio):/i) ||
-        line.match(/\.(com|org|net|edu|io|dev)/)
-      )) {
-        resumeData.header.contact.push(line);
-        continue;
-      }
-
-      // Detect section headers (more comprehensive)
-      if (line.match(/^(EDUCATION|SKILLS|KEY SKILLS|TECHNICAL SKILLS|PROGRAMMING SKILLS|LINKS|SOCIAL|COURSEWORK|COURSE WORK|EXPERIENCE|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|RESEARCH|AWARDS|ACHIEVEMENTS|PUBLICATIONS|PROJECTS|ADDITIONAL|CERTIFICATIONS|SUMMARY|PROFESSIONAL SUMMARY|OBJECTIVE)/i)) {
-        currentSection = line.toLowerCase().replace(/[^a-z]/g, '');
-        isHeaderSection = false;
-        continue;
-      }
-
-      // Also detect section headers with different formatting (e.g., "## EXPERIENCE")
-      const sectionMatch = line.match(/^#+\s*(EDUCATION|SKILLS|KEY SKILLS|TECHNICAL SKILLS|PROGRAMMING SKILLS|LINKS|SOCIAL|COURSEWORK|COURSE WORK|EXPERIENCE|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|RESEARCH|AWARDS|ACHIEVEMENTS|PUBLICATIONS|PROJECTS|ADDITIONAL|CERTIFICATIONS|SUMMARY|PROFESSIONAL SUMMARY|OBJECTIVE)/i);
-      if (sectionMatch) {
-        currentSection = sectionMatch[1].toLowerCase().replace(/[^a-z]/g, '');
-        isHeaderSection = false;
-        continue;
-      }
-
-      // Add content to appropriate sections
-      if (currentSection && line) {
-        switch (currentSection) {
-          case 'education':
-            resumeData.leftColumn.education.push(line);
-            break;
-          case 'skills':
-          case 'keyskills':
-          case 'technicalskills':
-          case 'programmingskills':
-            resumeData.leftColumn.skills.push(line);
-            break;
-          case 'links':
-          case 'social':
-            resumeData.leftColumn.links.push(line);
-            break;
-          case 'coursework':
-            resumeData.leftColumn.coursework.push(line);
-            break;
-          case 'experience':
-          case 'workexperience':
-          case 'professionalexperience':
-            resumeData.rightColumn.experience.push(line);
-            break;
-          case 'research':
-            resumeData.rightColumn.research.push(line);
-            break;
-          case 'awards':
-          case 'achievements':
-            resumeData.rightColumn.awards.push(line);
-            break;
-          case 'publications':
-            resumeData.rightColumn.publications.push(line);
-            break;
-          case 'projects':
-          case 'additional':
-          case 'certifications':
-            resumeData.leftColumn.additional.push(line);
-            break;
-          case 'summary':
-          case 'professionalsummary':
-          case 'objective':
-            // Add summary to the top of experience section
-            resumeData.rightColumn.experience.unshift(line);
-            break;
-          default:
-            // If we don't know where to put it, add to experience (main content)
-            resumeData.rightColumn.experience.push(line);
-        }
-      }
-    }
-
-    return resumeData;
-  };
-
-  // Key technologies and professional keywords for highlighting
-  const keyTechnologies = [
-    'java', 'spring', 'boot', 'microservices', 'rest', 'api', 'mongodb', 'postgresql',
-    'mysql', 'aws', 'docker', 'kubernetes', 'react', 'javascript', 'typescript',
-    'python', 'node', 'angular', 'vue', 'git', 'jenkins', 'ci/cd', 'agile', 'scrum',
-    'html', 'css', 'sass', 'webpack', 'redux', 'graphql', 'firebase', 'azure',
-    'spring boot', 'hibernate', 'maven', 'gradle', 'jvm', 'kotlin', 'scala',
-    'c++', 'c#', '.net', 'php', 'ruby', 'go', 'rust', 'swift', 'flutter', 'dart',
-    'tensorflow', 'pytorch', 'machine learning', 'ai', 'data science', 'sql'
-  ];
-
-  const professionalKeywords = [
-    'experience', 'years', 'developed', 'implemented', 'managed', 'led', 'built',
-    'designed', 'optimized', 'improved', 'achieved', 'delivered', 'collaborated',
-    'scalable', 'performance', 'architecture', 'team', 'project', 'solution',
-    'responsible', 'maintained', 'created', 'established', 'coordinated',
-    'senior', 'lead', 'principal', 'director', 'manager', 'increased', 'reduced',
-    'streamlined', 'enhanced', 'automated', 'integrated', 'deployed'
-  ];
-
-  const formatText = (text: string) => {
-    let formattedText = text
-      // Bold text **text** or __text__
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>')
-      .replace(/__(.*?)__/g, '<strong class="font-bold text-gray-900">$1</strong>')
-      // Italic text *text* or _text_
-      .replace(/\*(.*?)\*/g, '<em class="italic text-gray-700">$1</em>')
-      .replace(/_(.*?)_/g, '<em class="italic text-gray-700">$1</em>')
-      // Code or special formatting `text`
-      .replace(/`(.*?)`/g, '<code class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-mono">$1</code>')
-      // Links [text](url)
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-blue-600 hover:text-blue-800 underline font-medium">$1</a>')
-      // Email addresses
-      .replace(/([\w\.-]+@[\w\.-]+\.\w+)/g, '<a href="mailto:$1" class="text-blue-600 hover:text-blue-800 underline font-medium">$1</a>')
-      // Phone numbers
-      .replace(/(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/g, '<a href="tel:$1" class="text-blue-600 hover:text-blue-800 underline font-medium">$1</a>')
-      // LinkedIn profiles
-      // .replace(/(https?:\/\/www\.linkedin\.com\/in\/[^\s]+)/g, '<a href=\"$1\" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline font-medium">LinkedIn</a>')
-      // URLs
-      .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:text-blue-800 underline font-medium">$1</a>');
-
-    return formattedText;
-  };
-
-
-
-  // Enhanced function to detect and format job experiences with better company highlighting
-  const formatExperienceEntry = (text: string): string => {
-    let formattedText = formatText(text);
-
-    // Enhanced company name detection patterns
-    const companyPatterns = [
-      // Pattern: Position | Company Name | Date
-      /^(.+?)\s*\|\s*([A-Z][A-Za-z\s&.,'-]+(?:Inc|LLC|Corp|Corporation|Ltd|Limited|Co|Company|Technologies|Tech|Systems|Solutions|Group|Enterprises|Partners|University|College|Institute)?)\s*\|\s*(.+)$/,
-      // Pattern: Company Name | Position | Date
-      /^([A-Z][A-Za-z\s&.,'-]+(?:Inc|LLC|Corp|Corporation|Ltd|Limited|Co|Company|Technologies|Tech|Systems|Solutions|Group|Enterprises|Partners|University|College|Institute)?)\s*\|\s*(.+?)\s*\|\s*(.+)$/,
-      // Pattern: Position at Company Name (Date)
-      /^(.+?)\s+at\s+([A-Z][A-Za-z\s&.,'-]+(?:Inc|LLC|Corp|Corporation|Ltd|Limited|Co|Company|Technologies|Tech|Systems|Solutions|Group|Enterprises|Partners|University|College|Institute)?)\s*\((.+?)\)$/,
-      // Pattern: Company Name - Position (Date)
-      /^([A-Z][A-Za-z\s&.,'-]+(?:Inc|LLC|Corp|Corporation|Ltd|Limited|Co|Company|Technologies|Tech|Systems|Solutions|Group|Enterprises|Partners|University|College|Institute)?)\s*[-–]\s*(.+?)\s*\((.+?)\)$/
-    ];
-
-    for (const pattern of companyPatterns) {
-      const match = text.match(pattern);
-      if (match) {
-        let position: string, company: string, dates: string;
-
-        if (pattern.source.includes('at\\s+')) {
-          // Position at Company (Date) format
-          [, position, company, dates] = match;
-        } else if (pattern.source.startsWith('\\^\\(\\[A\\-Z\\]')) {
-          // Company | Position | Date format
-          [, company, position, dates] = match;
-        } else if (pattern.source.includes('\\-\\–')) {
-          // Company - Position (Date) format
-          [, company, position, dates] = match;
-        } else {
-          // Position | Company | Date format (default)
-          [, position, company, dates] = match;
-        }
-
-        // Create structured experience entry
-        return `
-          <div class="deedy-experience-entry">
-            <div class="deedy-experience-header">
-              <div class="deedy-position-company">
-                <span class="deedy-position">${formatText(position.trim())}</span>
-                <span class="deedy-company-separator">@</span>
-                <span class="deedy-company-name">${company.trim()}</span>
-              </div>
-              <span class="deedy-dates">${formatText(dates.trim())}</span>
-            </div>
-          </div>
-        `;
-      }
-    }
-
-    // If no pattern matches, apply general company highlighting
-    const generalCompanyPattern = /\b([A-Z][A-Za-z\s&.,'-]+(?:Inc|LLC|Corp|Corporation|Ltd|Limited|Co|Company|Technologies|Tech|Systems|Solutions|Group|Enterprises|Partners|University|College|Institute))\b/g;
-    formattedText = formattedText.replace(generalCompanyPattern, '<strong class="deedy-company-name">$1</strong>');
-
-    // Highlight key technologies
-    keyTechnologies.forEach(tech => {
-      const regex = new RegExp(`\\b${tech.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-      formattedText = formattedText.replace(regex, (match) =>
-        `<span class="deedy-tech-highlight">${match}</span>`
-      );
-    });
-
-    // Highlight professional keywords
-    professionalKeywords.forEach(keyword => {
-      const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-      formattedText = formattedText.replace(regex, (match) =>
-        `<span class="deedy-keyword-highlight">${match}</span>`
-      );
-    });
-
-    // Highlight numbers and metrics
-    formattedText = formattedText.replace(/\b(\d+(?:\.\d+)?(?:%|\+|k|K|M|years?|months?|\$))\b/g,
-      '<span class="deedy-metric-highlight">$1</span>'
-    );
-
-    return formattedText;
-  };
-
-  // Enhanced skills rendering
-  const renderSkillsList = (items: string[]) => {
-    return items.map((item, index) => {
-      // Check if it's a skill category (contains colon)
-      if (item.includes(':')) {
-        const [category, skills] = item.split(':');
-        return (
-          <div key={index} className="deedy-skill-category">
-            <h4 className="deedy-skill-category-title">{category.trim()}</h4>
-            <div className="deedy-skill-tags">
-              {skills.split(/[•,]/).map((skill, skillIndex) => {
-                const trimmedSkill = skill.trim();
-                if (!trimmedSkill) return null;
-                return (
-                  <span
-                    key={skillIndex}
-                    className="deedy-skill-tag"
-                    dangerouslySetInnerHTML={{ __html: formatText(trimmedSkill) }}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        );
-      }
-
-      // Regular skill item
-      return (
-        <div
-          key={index}
-          className="deedy-text-content"
-          dangerouslySetInnerHTML={{ __html: formatText(item) }}
-        />
-      );
-    });
-  };
-
-  // Render helper functions for different content types
-  const renderContentList = (items: string[], type: 'bullet' | 'text' | 'skills' = 'text', isExperience: boolean = false) => {
-    if (type === 'skills') {
-      return renderSkillsList(items);
-    }
-
-    return items.map((item, index) => {
-      // Use enhanced formatting for experience entries
-      const formattedContent = isExperience ? formatExperienceEntry(item) : formatText(item);
-
-      if (type === 'bullet') {
-        return (
-          <div key={index} className="deedy-bullet-item group">
-            <div className="deedy-bullet-point"></div>
-            <div
-              className="deedy-bullet-content"
-              dangerouslySetInnerHTML={{ __html: formattedContent }}
-            />
-          </div>
-        );
-      }
-
-      return (
-        <div
-          key={index}
-          className="deedy-text-content"
-          dangerouslySetInnerHTML={{ __html: formattedContent }}
-        />
-      );
-    });
-  };
-
-  const renderSectionHeader = (title: string) => (
-    <h3 className="deedy-section-header">
-      {title}
-    </h3>
-  );
-
-
-
-  const resumeData = parseResumeToStructure(content);
-
   return (
-    <div className={`deedy-resume ${className}`}>
-      {/* Header Section */}
-      <div className="deedy-header">
-        <div className="text-center">
-          <h1 className="deedy-name">
-            {resumeData.header.name || 'Your Name'}
-          </h1>
-          {resumeData.header.title && (
-            <h2 className="deedy-title">
-              {resumeData.header.title}
-            </h2>
-          )}
-          <div className="deedy-contact">
-            {resumeData.header.contact.map((contact, index) => (
-              <span
-                key={index}
-                className="deedy-contact-item"
-                dangerouslySetInnerHTML={{ __html: formatText(contact) }}
-              />
-            ))}
+    <div className={`resume-renderer ${className}`}>
+      {/* ATS Score Section */}
+      {atsScore && (
+        <div className={`mb-6 p-4 rounded-lg border-2 ${getScoreColor(atsScore.overall)}`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📊</span>
+              <span className="font-semibold text-lg">ATS Compatibility Score</span>
+            </div>
+            <div className="text-3xl font-bold">{atsScore.overall}%</div>
           </div>
+          
+          {/* Score Breakdown */}
+          <div className="grid grid-cols-5 gap-2 mb-3 text-xs">
+            <div className="text-center p-2 bg-white/50 rounded">
+              <div className="font-medium">Contact</div>
+              <div className="font-bold">{atsScore.sections.contactInfo}/20</div>
+            </div>
+            <div className="text-center p-2 bg-white/50 rounded">
+              <div className="font-medium">Skills</div>
+              <div className="font-bold">{atsScore.sections.skills}/25</div>
+            </div>
+            <div className="text-center p-2 bg-white/50 rounded">
+              <div className="font-medium">Experience</div>
+              <div className="font-bold">{atsScore.sections.experience}/30</div>
+            </div>
+            <div className="text-center p-2 bg-white/50 rounded">
+              <div className="font-medium">Education</div>
+              <div className="font-bold">{atsScore.sections.education}/15</div>
+            </div>
+            <div className="text-center p-2 bg-white/50 rounded">
+              <div className="font-medium">Format</div>
+              <div className="font-bold">{atsScore.sections.formatting}/10</div>
+            </div>
+          </div>
+          
+          {/* Suggestions */}
+          {atsScore.suggestions.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-current/20">
+              <div className="font-medium text-sm mb-2">💡 Suggestions to improve:</div>
+              <ul className="text-xs space-y-1">
+                {atsScore.suggestions.map((suggestion, i) => (
+                  <li key={i} className="flex items-start gap-1">
+                    <span>•</span>
+                    <span>{suggestion}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
-      {/* Two Column Layout */}
-      <div className="deedy-columns">
-        {/* Left Column */}
-        <div className="deedy-left-column">
-          {/* Education */}
-          {resumeData.leftColumn.education.length > 0 && (
-            <div className="deedy-section">
-              {renderSectionHeader('Education')}
-              <div className="deedy-section-content">
-                {renderContentList(resumeData.leftColumn.education)}
-              </div>
-            </div>
+      {/* Resume Content */}
+      <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+        {/* Header Section */}
+        <div className="bg-gradient-to-r from-blue-900 to-blue-700 text-white p-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-center mb-2">
+            {resume.name || 'Your Name'}
+          </h1>
+          {resume.title && (
+            <p className="text-blue-100 text-center text-lg mb-3">
+              {resume.title}
+            </p>
           )}
-
-          {/* Skills */}
-          {resumeData.leftColumn.skills.length > 0 && (
-            <div className="deedy-section">
-              {renderSectionHeader('Skills')}
-              <div className="deedy-section-content">
-                {renderContentList(resumeData.leftColumn.skills, 'skills')}
-              </div>
-            </div>
-          )}
-
-          {/* Links */}
-          {resumeData.leftColumn.links.length > 0 && (
-            <div className="deedy-section">
-              {renderSectionHeader('Links')}
-              <div className="deedy-section-content">
-                {renderContentList(resumeData.leftColumn.links)}
-              </div>
-            </div>
-          )}
-
-          {/* Coursework */}
-          {resumeData.leftColumn.coursework.length > 0 && (
-            <div className="deedy-section">
-              {renderSectionHeader('Coursework')}
-              <div className="deedy-section-content">
-                {renderContentList(resumeData.leftColumn.coursework)}
-              </div>
-            </div>
-          )}
-
-          {/* Additional */}
-          {resumeData.leftColumn.additional.length > 0 && (
-            <div className="deedy-section">
-              {renderSectionHeader('Additional')}
-              <div className="deedy-section-content">
-                {renderContentList(resumeData.leftColumn.additional)}
-              </div>
-            </div>
-          )}
-
-          {/* Fallback: If left column is empty, show a placeholder */}
-          {resumeData.leftColumn.education.length === 0 &&
-           resumeData.leftColumn.skills.length === 0 &&
-           resumeData.leftColumn.links.length === 0 &&
-           resumeData.leftColumn.coursework.length === 0 &&
-           resumeData.leftColumn.additional.length === 0 && (
-            <div className="deedy-section">
-              {renderSectionHeader('Skills')}
-              <div className="deedy-section-content">
-                <p className="text-gray-500 text-sm italic">Add your skills and qualifications here</p>
-              </div>
+          {resume.contact.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm text-blue-100">
+              {resume.contact.map((item, index) => (
+                <span 
+                  key={index}
+                  dangerouslySetInnerHTML={{ __html: formatContent(item) }}
+                  className="[&_a]:text-blue-200 [&_a]:hover:text-white"
+                />
+              ))}
             </div>
           )}
         </div>
 
-        {/* Right Column */}
-        <div className="deedy-right-column">
-          {/* Experience */}
-          {resumeData.rightColumn.experience.length > 0 && (
-            <div className="deedy-section">
-              {renderSectionHeader('Experience')}
-              <div className="deedy-section-content">
-                {renderContentList(resumeData.rightColumn.experience, 'bullet', true)}
+        {/* Content Sections */}
+        <div className="p-6 space-y-6">
+          {resume.sections.map((section, sectionIndex) => (
+            <div key={sectionIndex} className="resume-section">
+              {/* Section Header */}
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b-2 border-blue-200">
+                <span className="text-lg">{getSectionIcon(section.type)}</span>
+                <h2 className="text-lg font-bold text-blue-900 uppercase tracking-wide">
+                  {section.title}
+                </h2>
+              </div>
+
+              {/* Section Content */}
+              <div className="space-y-2">
+                {section.content.map((item, itemIndex) => {
+                  const isBullet = item.startsWith('•') || item.startsWith('-') || item.startsWith('·');
+                  const isJobEntry = item.match(/\|.*\d{4}/) || item.match(/\d{4}\s*[-–]\s*(present|\d{4})/i);
+                  const isSkillCategory = item.includes(':') && section.type === 'skills';
+
+                  // Job entry with company/dates
+                  if (isJobEntry) {
+                    return (
+                      <div key={itemIndex} className="font-semibold text-gray-800 mt-4 first:mt-0">
+                        {item}
+                      </div>
+                    );
+                  }
+
+                  // Skill category
+                  if (isSkillCategory) {
+                    const [category, skills] = item.split(':');
+                    return (
+                      <div key={itemIndex} className="mb-2">
+                        <span className="font-semibold text-gray-700">{category}:</span>
+                        <span className="text-gray-600"> {skills}</span>
+                      </div>
+                    );
+                  }
+
+                  // Bullet point
+                  if (isBullet) {
+                    return (
+                      <div key={itemIndex} className="flex items-start gap-2 ml-2">
+                        <span className="text-blue-500 mt-1.5 text-xs">●</span>
+                        <span 
+                          className="text-gray-700 flex-1"
+                          dangerouslySetInnerHTML={{ __html: formatContent(item.replace(/^[•\-·]\s*/, '')) }}
+                        />
+                      </div>
+                    );
+                  }
+
+                  // Regular text
+                  return (
+                    <div 
+                      key={itemIndex} 
+                      className="text-gray-700"
+                      dangerouslySetInnerHTML={{ __html: formatContent(item) }}
+                    />
+                  );
+                })}
               </div>
             </div>
-          )}
+          ))}
 
-          {/* Research */}
-          {resumeData.rightColumn.research.length > 0 && (
-            <div className="deedy-section">
-              {renderSectionHeader('Research')}
-              <div className="deedy-section-content">
-                {renderContentList(resumeData.rightColumn.research, 'bullet')}
-              </div>
-            </div>
-          )}
-
-          {/* Awards */}
-          {resumeData.rightColumn.awards.length > 0 && (
-            <div className="deedy-section">
-              {renderSectionHeader('Awards')}
-              <div className="deedy-section-content">
-                {renderContentList(resumeData.rightColumn.awards)}
-              </div>
-            </div>
-          )}
-
-          {/* Publications */}
-          {resumeData.rightColumn.publications.length > 0 && (
-            <div className="deedy-section">
-              {renderSectionHeader('Publications')}
-              <div className="deedy-section-content">
-                {renderContentList(resumeData.rightColumn.publications)}
-              </div>
-            </div>
-          )}
-
-          {/* Fallback: If right column is empty, show a placeholder */}
-          {resumeData.rightColumn.experience.length === 0 &&
-           resumeData.rightColumn.research.length === 0 &&
-           resumeData.rightColumn.awards.length === 0 &&
-           resumeData.rightColumn.publications.length === 0 && (
-            <div className="deedy-section">
-              {renderSectionHeader('Experience')}
-              <div className="deedy-section-content">
-                <p className="text-gray-500 text-sm italic">Add your work experience and achievements here</p>
-              </div>
+          {/* Empty state */}
+          {resume.sections.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              <p>No sections found in the resume content.</p>
+              <p className="text-sm mt-2">The resume may need proper section headers like EXPERIENCE, SKILLS, EDUCATION.</p>
             </div>
           )}
         </div>

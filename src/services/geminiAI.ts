@@ -1,23 +1,225 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getUserEnvVarAsync } from './env';
+// Hybrid AI Service
+// Uses GitHub Enterprise Proxy for local development, Gemini API for production
+// The Vite proxy forwards /api/llm/* to http://localhost:9001/v1/*
 
-// Initialize the Gemini AI client
-const getGeminiClient = async () => {
-  const apiKey = await getUserEnvVarAsync('VITE_GEMINI_API_KEY');
+const LOCAL_BACKEND_URL = '/api/llm/chat/completions';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_API_KEY = 'AIzaSyAD4URN7ASl5yuP8vmpbE_GaNYnU-RmuMM';
 
-  console.log(`🔑 Gemini API Key status: ${apiKey ? 'Found' : 'Not found'}`);
-  console.log(`🔑 API Key length: ${apiKey?.length || 0} characters`);
-  console.log(`🔑 API Key preview: ${apiKey ? apiKey.substring(0, 10) + '...' : 'None'}`);
+// Detect if running locally
+const isLocalEnvironment = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const hostname = window.location.hostname;
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.');
+};
 
-  if (!apiKey) {
-    throw new Error('VITE_GEMINI_API_KEY is not configured. Please add your Gemini API key to the environment variables.');
+// Available models via GitHub Enterprise Proxy (local)
+const GITHUB_PROXY_MODELS = [
+  'gpt-4o',
+  'gpt-4-turbo',
+  'gpt-3.5-turbo'
+];
+
+// Available Gemini models (production)
+const GEMINI_MODELS = [
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+  'gemini-pro'
+];
+
+// Hardcoded base resume for best ATS score
+export const BASE_RESUME = `BHUPENDER KUMAR
+Senior Full Stack Developer | Web3 & Blockchain Engineer | 12+ Years Experience
+
+New Delhi, India | +91 9717267473 | rajus9231@gmail.com
+linkedin.com/in/bhupik | github.com/bhupenderkumar
+
+PROFESSIONAL SUMMARY
+Senior Full Stack Developer with 12+ years of experience in enterprise software development, Web3/Blockchain technologies, and distributed systems. Expertise in Java, Spring Boot, React, TypeScript, Solana, Ethereum, Rust/Anchor, and DeFi protocols. Proven track record of building trading systems, decentralized applications, RWA tokenization platforms, and microservices architecture. Strong background in capital markets technology, smart contract development, AI/LLM integration, and multi-agent systems.
+
+TECHNICAL SKILLS
+Blockchain & Web3: Solana, Ethereum, Rust, Anchor Framework, Solidity, Web3.js, Smart Contracts, DeFi, Token Development, RWA Tokenization, Drift Protocol, Token-2022, Wormhole
+Backend: Java, Spring Boot, Spring Framework, Python, FastAPI, Node.js, TypeScript, Kotlin, REST APIs, GraphQL, Microservices, JAXB
+Frontend: React, Next.js 14, Angular, JavaScript, TypeScript, HTML5, CSS3, TailwindCSS, shadcn/ui, jQuery
+Databases: MongoDB, PostgreSQL, Elasticsearch, Redis, SQLite
+DevOps & Tools: Docker, Kubernetes, Git, GitHub Actions, Kibana, Logstash, ELK Stack, Jenkins, AWS, Railway, Nginx
+AI/ML: LLM Integration (OpenAI, Anthropic, Groq), Model Context Protocol (MCP), DialogFlow, Rasa, AI Agents, Multi-Agent Systems
+
+PROFESSIONAL EXPERIENCE
+
+Senior Software Engineer | Lab49, Noida, India | Jun 2021 - Present
+• Lead design and development of decentralized applications (dApps) and smart contracts on Solana and Ethereum blockchain networks
+• Build trading systems and DeFi protocols for capital markets technology using Rust/Anchor and Solidity
+• Architect scalable microservices using Spring Boot with high-performance backend systems
+• Develop responsive frontend applications with React and TypeScript
+• Implement Web3 integrations including wallet connections, token transfers, and on-chain data processing
+• Built RWA Asset Tokenization platform enabling banks to tokenize real-world assets on Solana with Securitize, Civic Pass KYC/AML, and Anchorage Digital custody integration
+• Technologies: Solana, Ethereum, Rust, Anchor, Solidity, Web3.js, Java, Spring Boot, React, TypeScript, Token-2022
+
+Java Software Engineer | Colt Technology Services | Sep 2018 - May 2021
+• Led implementation of Kibana ELK Stack monitoring dashboards, reducing incident response times by 40%
+• Automated repetitive workflows through Python scripts, reducing manual efforts by 60%
+• Built full-stack applications with Angular frontend and Java Spring backend
+• Collaborated with stakeholders to define requirements and deliver solutions aligned with business objectives
+• Technologies: Java, Angular, Python, Kibana, Elasticsearch, Logstash, JavaScript
+
+Software Engineer | Bureau Veritas Group, Noida, India | Oct 2016 - Sep 2018
+• Developed workflow optimization utility that reduced processing time from 3 days to 20 minutes (90% improvement)
+• Created decision-support program for data-driven decisions, increasing response speed across departments
+• Resolved major connection leaks, improving system stability in high-concurrency environments
+• Technologies: Java, Spring Framework, jQuery, AJAX
+
+Software Engineer | DXC Technology, Gurugram, India | Oct 2015 - Jan 2017
+• Implemented Lazy Loading in JAXB context creation, significantly reducing initialization times
+• Developed .NET Web Service integration tool, automating metadata extraction and reducing response time by 30%
+• Redesigned MongoDB client connection pooling for optimized database performance under heavy load
+• Technologies: Java, MongoDB, Spring Framework, JAXB
+
+Mobile Application Developer | Canon India, Gurugram, India | Oct 2014 - Oct 2015
+• Developed cross-platform mobile applications using PhoneGap framework for iOS and Android
+• Implemented XML parsing with jQuery and SOAP web services integration
+• Received Best Trainee Award for delivering two hybrid apps with 4.8/5 average rating
+• Technologies: PhoneGap, JavaScript, jQuery, SOAP
+
+KEY PROJECTS (GitHub: github.com/bhupenderkumar - 103+ repositories)
+
+• Solana Trading Bot: Automated trading system for Solana DeFi markets with natural language rule input, LLM-powered parsing (OpenAI/Anthropic), Drift Protocol integration for perpetuals trading, Docker persistence, WebSocket real-time updates. Tech: TypeScript, Python, FastAPI, React, PostgreSQL, Docker
+
+• RWA Asset Tokenization Platform: Enterprise-grade infrastructure for tokenizing real-world bank assets on Solana. Features bank portal, investor marketplace, Securitize API integration, Civic Pass KYC/AML, Anchorage Digital custody, RedStone oracles, Token-2022 compliance hooks. Tech: TypeScript, Rust/Anchor, Next.js, Node.js, PostgreSQL, AWS
+
+• Solana MCP Server: Model Context Protocol server with 31 tools for Solana blockchain actions - wallet creation, balance checks, token transfers, price feeds, devnet airdrops, meme coin creation guides, local validator support. Tech: Java, Spring Boot 3.5, Spring AI MCP 1.1.2, Solana JSON-RPC
+
+• Multi-Agent Copilot (agent-master): VS Code extension orchestrating multiple AI agents for collaborative coding - Planner, Coder, Tester, Reviewer, Docs agents with shared state management and GitHub Copilot integration. Tech: TypeScript, VS Code Extension API
+
+• Solana Meme Coin Trading Bot: AI-powered trading bot with real-time CoinGecko prices, Groq LLM analysis, OHLCV candlestick charts from Binance, paper trading with $10K virtual money, portfolio tracking. Supports BONK, WIF, POPCAT, MEW, BOME. Tech: Next.js 14, FastAPI, Python, TailwindCSS
+
+• Agent Deployment System: AI-powered deployment system using Agency Swarm for automated GitHub repo deployment, rollback, and monitoring via natural language commands. Tech: Python, TypeScript, Docker, GitHub Enterprise
+
+• Polymarket Copy Trading Bot: Automated copy trading bot for prediction markets using Python
+• Sentinel: Security testing platform for vulnerability scanning using TypeScript
+• Shiksha/Digital School: Educational platforms with React, TypeScript frontend
+• Subscription Management: Full-stack subscription system with Java backend and TypeScript UI
+
+EDUCATION
+Bachelor of Technology in Computer Science Engineering | 2011 - 2015
+University of Technical Education (UPTU), Greater Noida, UP
+CGPA: 7.2 | Major: Software Engineering
+
+CERTIFICATIONS
+• SCJP - Sun Certified Java Programmer
+• ISTQB - Software Testing Certification
+• AWS Machine Learning – Specialty (Associate-level) Certification
+`;
+
+// Call GitHub Enterprise Proxy for AI generation (OpenAI-compatible)
+const callGitHubProxy = async (prompt: string, model: string = 'gpt-4o'): Promise<string> => {
+  console.log(`🤖 Calling GitHub Enterprise Proxy (${model})...`);
+  console.log(`📝 Prompt length: ${prompt.length} characters`);
+  
+  try {
+    const response = await fetch(LOCAL_BACKEND_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert resume writer and career consultant. Generate professional, ATS-optimized content.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        stream: false,
+        max_tokens: 4000,
+        temperature: 0.7
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ GitHub Proxy error:', response.status, errorText);
+      throw new Error(`GitHub Proxy error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ GitHub Proxy response received');
+    
+    // OpenAI-compatible response format
+    const content = data.choices?.[0]?.message?.content || '';
+    
+    if (!content) {
+      throw new Error('Empty response from GitHub Proxy');
+    }
+    
+    return content;
+  } catch (error) {
+    console.error('❌ Failed to call GitHub Proxy:', error);
+    throw error;
   }
+};
 
-  if (apiKey === 'YOUR_ACTUAL_GEMINI_API_KEY_HERE') {
-    throw new Error('Demo API key is not configured. Please replace the placeholder with your actual Gemini API key.');
+// Call Gemini API for AI generation (production)
+const callGeminiAPI = async (prompt: string, model: string = 'gemini-1.5-flash'): Promise<string> => {
+  console.log(`🤖 Calling Gemini API (${model})...`);
+  console.log(`📝 Prompt length: ${prompt.length} characters`);
+  
+  try {
+    const response = await fetch(`${GEMINI_API_URL}/${model}:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: `You are an expert resume writer and career consultant. Generate professional, ATS-optimized content.\n\n${prompt}`
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192,
+        },
+        safetySettings: [
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+        ]
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
+      console.error('❌ Gemini API error:', response.status, errorData);
+      throw new Error(`Gemini API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ Gemini API response received');
+    
+    // Gemini response format
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    if (!content) {
+      throw new Error('Empty response from Gemini API');
+    }
+    
+    return content;
+  } catch (error) {
+    console.error('❌ Failed to call Gemini API:', error);
+    throw error;
   }
-
-  return new GoogleGenerativeAI(apiKey);
 };
 
 export interface ResumeGenerationRequest {
@@ -57,55 +259,43 @@ export const generateResumeWithAI = async ({
 };
 
 
-// Available Gemini models in order of preference
-const GEMINI_MODELS = [
-  "gemini-1.5-flash",
-  "gemini-1.5-pro",
-  "gemini-pro",
-  "gemini-1.0-pro"
-];
-
-// Function to try multiple models with fallback
-const generateWithFallback = async (prompt: string, genAI: any, onModelChange?: (model: string) => void): Promise<string> => {
-  let lastError: any = null;
-
-  for (const modelName of GEMINI_MODELS) {
+// Function to generate content with model fallback
+const generateWithFallback = async (prompt: string, _unused?: any, onModelChange?: (model: string) => void): Promise<string> => {
+  let lastError: Error | null = null;
+  const isLocal = isLocalEnvironment();
+  const models = isLocal ? GITHUB_PROXY_MODELS : GEMINI_MODELS;
+  const apiName = isLocal ? 'GitHub Proxy' : 'Gemini API';
+  
+  console.log(`🌍 Environment: ${isLocal ? 'LOCAL' : 'PRODUCTION'} - Using ${apiName}`);
+  
+  for (const model of models) {
     try {
-      console.log(`🤖 Trying model: ${modelName}`);
+      console.log(`🤖 Trying ${apiName} with model: ${model}`);
       if (onModelChange) {
-        onModelChange(modelName);
+        onModelChange(model);
       }
 
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const text = isLocal 
+        ? await callGitHubProxy(prompt, model)
+        : await callGeminiAPI(prompt, model);
 
       if (text && text.trim()) {
-        console.log(`✅ Success with model: ${modelName}`);
+        console.log(`✅ Success with ${model}`);
         console.log(`📝 Generated content length: ${text.length} characters`);
         console.log(`📄 Content preview: ${text.substring(0, 200)}...`);
         return text;
       } else {
-        console.warn(`⚠️ Model ${modelName} returned empty content`);
+        console.warn(`⚠️ ${model} returned empty content, trying next model...`);
+        lastError = new Error(`${model} returned empty response`);
       }
     } catch (error: any) {
-      console.warn(`❌ Model ${modelName} failed:`, error.message);
+      console.error(`❌ ${model} failed:`, error.message);
       lastError = error;
-
-      // If it's a 503 (overloaded) error, try next model
-      if (error.message?.includes('503') || error.message?.includes('overloaded') || error.message?.includes('UNAVAILABLE')) {
-        console.log(`🔄 Model ${modelName} is overloaded, trying next model...`);
-        continue;
-      }
-
-      // For other errors, also try next model but log differently
-      console.log(`⚠️ Model ${modelName} error, trying next model...`);
+      // Continue to next model
     }
   }
-
-  // If all models failed, throw the last error
-  throw new Error(`All Gemini models failed. Last error: ${lastError?.message || 'Unknown error'}`);
+  
+  throw lastError || new Error(`All ${apiName} models failed to generate content`);
 };
 
 // Helper function to extract and preserve key employment information
@@ -264,6 +454,30 @@ const validateEmploymentPreservation = (originalResume: string, generatedResume:
   };
 };
 
+// Validate that resume content is not corrupted JSON or API response data
+const isValidResumeContent = (content: string | undefined): boolean => {
+  if (!content || content.trim().length < 50) return false;
+  
+  // Check if content looks like JSON (API request/response)
+  const trimmed = content.trim();
+  if (trimmed.startsWith('{') && (trimmed.includes('"model"') || trimmed.includes('"messages"') || trimmed.includes('"choices"'))) {
+    console.warn('⚠️ Detected API JSON instead of resume content, will use BASE_RESUME');
+    return false;
+  }
+  
+  // Check if it looks like actual resume content (has name, contact info, or experience)
+  const hasResumeContent = /[a-zA-Z]{2,}\s+[a-zA-Z]{2,}/.test(content) && // Has at least 2 words
+    (content.includes('@') || // Has email
+     content.includes('Experience') ||
+     content.includes('EXPERIENCE') ||
+     content.includes('Skills') ||
+     content.includes('SKILLS') ||
+     content.includes('Education') ||
+     content.includes('EDUCATION'));
+  
+  return hasResumeContent;
+};
+
 export const generateAllDocuments = async ({
   jobDescription,
   baseResume,
@@ -274,13 +488,19 @@ export const generateAllDocuments = async ({
   onModelChange
 }: ResumeGenerationRequest): Promise<GenerationResult> => {
   try {
+    // Validate baseResume content - use BASE_RESUME if invalid or corrupted
+    const isBaseResumeValid = isValidResumeContent(baseResume);
+    const effectiveResume = isBaseResumeValid ? baseResume! : BASE_RESUME;
+    const isLocal = isLocalEnvironment();
+    
     console.log('🌍 AI Service - Generating documents with language:', language, 'country:', country);
+    console.log(`🤖 Environment: ${isLocal ? 'LOCAL (GitHub Proxy)' : 'PRODUCTION (Gemini API)'}`);
+    console.log('📄 Base resume valid:', isBaseResumeValid);
+    console.log('📄 Using', isBaseResumeValid ? 'provided resume' : 'hardcoded BASE_RESUME for ATS optimization');
 
     // Extract employment information to preserve authenticity
-    const employmentInfo = extractEmploymentInfo(baseResume || '');
+    const employmentInfo = extractEmploymentInfo(effectiveResume);
     console.log('📋 Extracted employment info:', employmentInfo);
-
-    const genAI = await getGeminiClient();
 
     // Get language-specific formatting and cultural guidelines
     const getLanguageGuidelines = (lang: string, country: string) => {
@@ -358,11 +578,11 @@ ${langGuidelines.example ? `- **FORMAT EXAMPLE:** ${langGuidelines.example}` : '
     let prompts: { [key: string]: string } = {};
 
     if (generateType === 'resume' || generateType === 'all') {
-      if (editPrompt && baseResume) {
+      if (editPrompt) {
         prompts.resume = `
 You are an expert ATS resume writer. Create a FINAL, COMPLETE resume optimized for THIS JOB using the candidate's REAL work experience.
 
-CURRENT RESUME: ${baseResume}
+CURRENT RESUME: ${effectiveResume}
 ENHANCEMENT REQUEST: ${editPrompt}
 TARGET JOB: ${jobDescription}
 
@@ -412,11 +632,11 @@ ${formatInstructions}
 
 IMPORTANT: Enhance REAL experience only. Never create fictional work history.
         `;
-      } else if (baseResume) {
+      } else {
         prompts.resume = `
 You are an expert resume writer. Create a FINAL, COMPLETE resume optimized for THIS JOB using the candidate's REAL work experience.
 
-ORIGINAL RESUME: ${baseResume}
+ORIGINAL RESUME: ${effectiveResume}
 TARGET JOB: ${jobDescription}
 
 **CRITICAL LANGUAGE REQUIREMENT:**
@@ -471,58 +691,6 @@ ${formatInstructions}
 
 IMPORTANT: Enhance REAL experience only. Never create fictional work history.
         `;
-      } else {
-        prompts.resume = `
-You are an expert resume writer. Create a PROFESSIONAL RESUME TEMPLATE optimized for THIS JOB.
-
-NOTE: Since no base resume was provided, this will be a template that the user should customize with their real information.
-
-TARGET JOB: ${jobDescription}
-
-**CRITICAL LANGUAGE REQUIREMENT:**
-LANGUAGE: ${language.toUpperCase()} - Write the ENTIRE resume in ${language === 'en' ? 'English' : language === 'ja' ? 'Japanese (日本語)' : language === 'es' ? 'Spanish (Español)' : language === 'fr' ? 'French (Français)' : language === 'de' ? 'German (Deutsch)' : 'English'}
-MARKET: ${country}
-
-**MANDATORY:** Every single word, sentence, and section must be written in ${language === 'en' ? 'English' : language === 'ja' ? 'Japanese' : language === 'es' ? 'Spanish' : language === 'fr' ? 'French' : language === 'de' ? 'German' : 'English'}. Do not mix languages.
-
-${formatInstructions}
-
-**TEMPLATE CREATION GUIDELINES:**
-- Create a professional template with realistic example content
-- Include ALL required technologies and skills from the job description
-- Show examples of relevant projects and achievements
-- Use professional formatting and structure
-- Include placeholder sections for education, skills, and experience
-
-**TEMPLATE STRUCTURE:**
-- Professional name placeholder (e.g., "Your Name")
-- Contact information template
-- Professional summary highlighting job-relevant skills
-- Skills section matching job requirements
-- Experience section with relevant role examples
-- Education section template
-- Additional sections as needed (certifications, projects)
-
-**CONTENT APPROACH:**
-- Focus on skills and technologies mentioned in the job description
-- Provide examples of how to describe relevant experience
-- Include quantified achievement examples
-- Use industry-appropriate terminology
-- Structure content for ATS optimization
-
-**FORBIDDEN:**
-- NO square brackets, conditional text, or placeholder text in final output
-- NO instructions to the user within the resume content
-- NO obviously fake company names or unrealistic claims
-
-**OUTPUT:**
-- Generate ONLY the complete resume template content
-- Professional formatting ready for customization
-- Optimized for the target job requirements
-- Include realistic examples that users can adapt
-
-IMPORTANT: Create a professional template that users can customize with their real information.
-        `;
       }
     }
 
@@ -534,7 +702,7 @@ CRITICAL: Create a complete cover letter with ZERO placeholder text.
 You are an expert cover letter writer. Create a FINAL, COMPLETE cover letter to get the candidate shortlisted.
 
 JOB: ${jobDescription}
-${baseResume ? `CANDIDATE: ${baseResume}` : ''}
+CANDIDATE: ${effectiveResume}
 
 **CRITICAL LANGUAGE REQUIREMENT:**
 LANGUAGE: ${language.toUpperCase()} - Write the ENTIRE cover letter in ${language === 'en' ? 'English' : language === 'ja' ? 'Japanese (日本語)' : language === 'es' ? 'Spanish (Español)' : language === 'fr' ? 'French (Français)' : language === 'de' ? 'German (Deutsch)' : 'English'}
@@ -600,7 +768,7 @@ CRITICAL: Create a complete email with ZERO placeholder text. Never mention wher
 You are an expert at writing job application emails. Create a FINAL, COMPLETE email to get the candidate noticed.
 
 JOB: ${jobDescription}
-${baseResume ? `CANDIDATE: ${baseResume}` : ''}
+CANDIDATE: ${effectiveResume}
 
 **CRITICAL LANGUAGE REQUIREMENT:**
 LANGUAGE: ${language.toUpperCase()} - Write the ENTIRE email in ${language === 'en' ? 'English' : language === 'ja' ? 'Japanese (日本語)' : language === 'es' ? 'Spanish (Español)' : language === 'fr' ? 'French (Français)' : language === 'de' ? 'German (Deutsch)' : 'English'}
@@ -668,7 +836,7 @@ IMPORTANT: Create a complete email with NO placeholder text. Use generic profess
       try {
         console.log(`📝 Generating ${type}...`);
 
-        let content = await generateWithFallback(prompt, genAI, (modelName) => {
+        let content = await generateWithFallback(prompt, null, (modelName) => {
           console.log(`🔄 Using model ${modelName} for ${type}`);
           if (onModelChange) {
             onModelChange(modelName, type);
@@ -691,7 +859,7 @@ ${prompt}
 REMINDER: Write the entire response in ${language === 'ja' ? 'Japanese' : language === 'es' ? 'Spanish' : language === 'fr' ? 'French' : language === 'de' ? 'German' : 'English'} language only.`;
 
           try {
-            const retryContent = await generateWithFallback(explicitPrompt, genAI, (modelName) => {
+            const retryContent = await generateWithFallback(explicitPrompt, null, (modelName) => {
               console.log(`🔄 Retry using model ${modelName} for ${type} with explicit language prompt`);
               if (onModelChange) {
                 onModelChange(modelName, type);
@@ -712,16 +880,14 @@ REMINDER: Write the entire response in ${language === 'ja' ? 'Japanese' : langua
         if (type === 'resume') {
           result.resume = content;
 
-          // Validate employment information preservation if base resume exists
-          if (baseResume) {
-            const validation = validateEmploymentPreservation(baseResume, content);
-            if (!validation.isValid) {
-              console.warn('⚠️ Employment preservation warnings:', validation.warnings);
-              // Log warnings but don't fail the generation
-              validation.warnings.forEach(warning => console.warn(`   - ${warning}`));
-            } else {
-              console.log('✅ Employment information preserved successfully');
-            }
+          // Always validate employment information preservation
+          const validation = validateEmploymentPreservation(effectiveResume, content);
+          if (!validation.isValid) {
+            console.warn('⚠️ Employment preservation warnings:', validation.warnings);
+            // Log warnings but don't fail the generation
+            validation.warnings.forEach(warning => console.warn(`   - ${warning}`));
+          } else {
+            console.log('✅ Employment information preserved successfully');
           }
         } else if (type === 'coverLetter') {
           result.coverLetter = content;
@@ -761,18 +927,53 @@ export const generateResumeOnly = async (params: ResumeGenerationRequest): Promi
 };
 
 export const validateApiKey = async (): Promise<boolean> => {
+  const isLocal = isLocalEnvironment();
+  
   try {
-    const genAI = await getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    
-    // Test with a simple prompt
-    const result = await model.generateContent("Hello");
-    const response = result.response;
-    const text = response.text();
-    
-    return text && text.length > 0;
+    if (isLocal) {
+      // Test GitHub Enterprise Proxy connection with a simple request
+      const response = await fetch(LOCAL_BACKEND_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: 'Hello' }],
+          max_tokens: 10
+        }),
+      });
+      
+      if (response.ok) {
+        console.log('✅ GitHub Enterprise Proxy validated successfully');
+        return true;
+      }
+      
+      console.warn('⚠️ GitHub Enterprise Proxy validation failed:', response.status);
+      return false;
+    } else {
+      // Test Gemini API connection
+      const response = await fetch(`${GEMINI_API_URL}/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'Hello' }] }],
+          generationConfig: { maxOutputTokens: 10 }
+        }),
+      });
+      
+      if (response.ok) {
+        console.log('✅ Gemini API validated successfully');
+        return true;
+      }
+      
+      console.warn('⚠️ Gemini API validation failed:', response.status);
+      return false;
+    }
   } catch (error) {
-    console.error('API key validation failed:', error);
+    console.error('❌ API validation error:', error);
     return false;
   }
 };

@@ -25,6 +25,7 @@ import EnhancedPrintManager from "@/components/EnhancedPrintManager";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
 import { createCleanPrintWindow } from "@/utils/printUtils";
 import { downloadResumeAsPDF, downloadCoverLetterAsPDF, downloadEmailAsPDF, testPDFGeneration } from "@/utils/resumeDownloader";
+import { downloadATSResume, calculateATSScore, type ATSScore } from "@/utils/atsResumeGenerator";
 
 interface DocumentGeneratorProps {
   jobDescription: string;
@@ -45,6 +46,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
   const [enhancementPrompt, setEnhancementPrompt] = useState("");
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [showPWAPrompt, setShowPWAPrompt] = useState(false);
+  const [atsScore, setAtsScore] = useState<ATSScore | null>(null);
 
   const { toast } = useToast();
 
@@ -107,6 +109,13 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       }
 
       setDocuments(result);
+
+      // Calculate ATS Score for the resume
+      if (result.resume) {
+        const score = calculateATSScore(result.resume);
+        setAtsScore(score);
+        console.log('📊 ATS Score calculated:', score.overall);
+      }
 
       // Save application to localStorage for tracking
       saveApplicationToStorage(result);
@@ -184,6 +193,14 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
       });
 
       setDocuments(result);
+      
+      // Recalculate ATS Score after enhancement
+      if (result.resume) {
+        const score = calculateATSScore(result.resume);
+        setAtsScore(score);
+        console.log('📊 Updated ATS Score:', score.overall);
+      }
+      
       setEnhancementPrompt(""); // Clear the prompt after successful enhancement
       toast({
         title: "Documents Enhanced Successfully",
@@ -266,16 +283,20 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      console.log('🚀 Starting resume download with exact UI matching...');
-      console.log('📄 Resume content type:', typeof documents.resume);
+      console.log('🚀 Starting ATS-optimized resume download...');
       console.log('📄 Resume content length:', documents.resume?.length || 0);
-      console.log('📄 Resume content preview:', documents.resume?.substring(0, 200) || 'No content');
 
-      await downloadResumeAsPDF(documents.resume);
+      // Use the new ATS-optimized PDF generator
+      const score = downloadATSResume(documents.resume);
+      setAtsScore(score);
 
       toast({
-        title: "Professional Resume Downloaded!",
-        description: "Your resume has been saved as a full-size professional PDF with proper Deedy CV formatting and ATS-friendly layout.",
+        title: `Resume Downloaded! ATS Score: ${score.overall}%`,
+        description: score.overall >= 80 
+          ? "Excellent! Your resume is highly ATS-compatible."
+          : score.overall >= 60 
+            ? "Good! Your resume has solid ATS compatibility."
+            : "Consider improving your resume based on the suggestions.",
       });
     } catch (error) {
       console.error('Download error:', error);
@@ -557,7 +578,20 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
             <TabsContent value="resume" className="mt-4">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Professional Resume</h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-semibold">Professional Resume</h3>
+                    {atsScore && (
+                      <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                        atsScore.overall >= 80 
+                          ? 'bg-green-100 text-green-700' 
+                          : atsScore.overall >= 60 
+                            ? 'bg-yellow-100 text-yellow-700' 
+                            : 'bg-red-100 text-red-700'
+                      }`}>
+                        ATS Score: {atsScore.overall}%
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -576,19 +610,19 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                       Print
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="default"
                       size="sm"
                       onClick={() => handleDownloadResume()}
-                      className="border-green-300 text-green-700 hover:bg-green-50 flex items-center"
+                      className="bg-green-600 hover:bg-green-700 text-white flex items-center"
                     >
                       <DownloadIcon className="w-3 h-3 mr-1" />
-                      Download PDF
+                      Download ATS PDF
                     </Button>
 
                   </div>
                 </div>
                 <div className="border rounded-lg p-4 bg-white max-h-[600px] overflow-y-auto">
-                  <ResumeRenderer content={documents.resume || ''} />
+                  <ResumeRenderer content={documents.resume || ''} showATSScore={true} />
                 </div>
               </div>
             </TabsContent>
