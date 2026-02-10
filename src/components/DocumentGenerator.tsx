@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
 import ResumeRenderer from "@/components/ResumeRenderer";
+import EditableResumeRenderer from "@/components/EditableResumeRenderer";
 import CoverLetterRenderer from "@/components/CoverLetterRenderer";
 import EnhancedPrintManager from "@/components/EnhancedPrintManager";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
@@ -50,6 +51,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
   country
 }) => {
   const [documents, setDocuments] = useState<GenerationResult>({});
+  const [editedResume, setEditedResume] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState("resume");
   const [enhancementPrompt, setEnhancementPrompt] = useState("");
@@ -59,7 +61,18 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
 
   const { toast } = useToast();
 
+  // Sync editedResume when documents.resume is first generated or regenerated
+  useEffect(() => {
+    if (documents.resume && !editedResume) {
+      setEditedResume(documents.resume);
+    }
+  }, [documents.resume, editedResume]);
+
+  // Reset editedResume when generating new documents
   const handleGenerateAll = async () => {
+    // Reset edited content when generating fresh
+    setEditedResume('');
+    
     if (!jobDescription.trim()) {
       toast({
         title: "Missing Job Description",
@@ -282,7 +295,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
   };
 
   const handleDownloadResume = async () => {
-    if (!documents.resume) {
+    const resumeContent = editedResume || documents.resume;
+    if (!resumeContent) {
       toast({
         title: "No Resume Available",
         description: "Please generate a resume first before downloading.",
@@ -293,18 +307,19 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
 
     try {
       console.log('🚀 Starting premium single-page resume download...');
-      console.log('📄 Resume content length:', documents.resume?.length || 0);
+      console.log('📄 Resume content length:', resumeContent.length);
+      console.log('📝 Using edited content:', !!editedResume);
 
       // Use the premium single-page PDF generator for maximum impact
-      downloadPremiumResume(documents.resume, 'resume-premium.pdf');
+      downloadPremiumResume(resumeContent, 'resume-premium.pdf');
       
       // Calculate ATS score for display
-      const score = calculateATSScore(documents.resume);
+      const score = calculateATSScore(resumeContent);
       setAtsScore(score);
 
       toast({
         title: `Premium Resume Downloaded! ATS Score: ${score.overall}%`,
-        description: "Single-page professional resume with maximum impact.",
+        description: editedResume ? "Your edited resume has been downloaded." : "Single-page professional resume with maximum impact.",
       });
     } catch (error) {
       console.error('Download error:', error);
@@ -318,7 +333,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
 
   // Alternative: Download ATS-optimized version
   const handleDownloadATSResume = async () => {
-    if (!documents.resume) {
+    const resumeContent = editedResume || documents.resume;
+    if (!resumeContent) {
       toast({
         title: "No Resume Available",
         description: "Please generate a resume first before downloading.",
@@ -329,7 +345,8 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
 
     try {
       console.log('🚀 Starting ATS-optimized resume download...');
-      const score = downloadATSResume(documents.resume);
+      console.log('📝 Using edited content:', !!editedResume);
+      const score = downloadATSResume(resumeContent);
       setAtsScore(score);
 
       toast({
@@ -636,7 +653,7 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => copyToClipboard(documents.resume || '', 'Resume')}
+                      onClick={() => copyToClipboard(editedResume || documents.resume || '', 'Resume')}
                     >
                       Copy Text
                     </Button>
@@ -688,7 +705,15 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                   </div>
                 </div>
                 <div className="border rounded-lg p-4 bg-white max-h-[600px] overflow-y-auto">
-                  <ResumeRenderer content={documents.resume || ''} showATSScore={true} />
+                  <EditableResumeRenderer 
+                    content={editedResume || documents.resume || ''} 
+                    onChange={(newContent) => {
+                      setEditedResume(newContent);
+                      // Also update documents for consistency
+                      setDocuments(prev => ({ ...prev, resume: newContent }));
+                    }}
+                    showATSScore={true} 
+                  />
                 </div>
               </div>
             </TabsContent>
