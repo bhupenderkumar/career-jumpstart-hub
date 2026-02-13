@@ -16,7 +16,7 @@ const isLocalEnvironment = (): boolean => {
 // Available models via GitHub Enterprise Proxy (local)
 const GITHUB_PROXY_MODELS = [
   'gpt-4o',
-  'gpt-4-turbo',
+  'gpt-4o-mini',
   'gpt-3.5-turbo'
 ];
 

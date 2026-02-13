@@ -6,12 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   FileTextIcon,
   MailIcon,
   FileIcon,
@@ -22,20 +16,16 @@ import {
   RefreshCwIcon,
   PrinterIcon,
   DownloadIcon,
-  ChevronDownIcon,
-  StarIcon
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateAllDocuments, GenerationResult } from "@/services/geminiAI";
-import ResumeRenderer from "@/components/ResumeRenderer";
 import EditableResumeRenderer from "@/components/EditableResumeRenderer";
 import CoverLetterRenderer from "@/components/CoverLetterRenderer";
 import EnhancedPrintManager from "@/components/EnhancedPrintManager";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
 import { createCleanPrintWindow } from "@/utils/printUtils";
-import { downloadResumeAsPDF, downloadCoverLetterAsPDF, downloadEmailAsPDF, testPDFGeneration } from "@/utils/resumeDownloader";
-import { downloadATSResume, calculateATSScore, type ATSScore } from "@/utils/atsResumeGenerator";
-import { downloadPremiumResume } from "@/utils/premiumPDFGenerator";
+import { downloadCoverLetterAsPDF, downloadEmailAsPDF } from "@/utils/resumeDownloader";
+import { downloadATSResume, calculateATSScore, type ATSScore } from "@/utils/unifiedATSGenerator";
 
 interface DocumentGeneratorProps {
   jobDescription: string;
@@ -306,60 +296,20 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      console.log('🚀 Starting premium single-page resume download...');
-      console.log('📄 Resume content length:', resumeContent.length);
-      console.log('📝 Using edited content:', !!editedResume);
-
-      // Use the premium single-page PDF generator for maximum impact
-      downloadPremiumResume(resumeContent, 'resume-premium.pdf');
-      
-      // Calculate ATS score for display
-      const score = calculateATSScore(resumeContent);
+      const score = downloadATSResume(resumeContent, 'resume-ats-optimized.pdf');
       setAtsScore(score);
 
       toast({
-        title: `Premium Resume Downloaded! ATS Score: ${score.overall}%`,
-        description: editedResume ? "Your edited resume has been downloaded." : "Single-page professional resume with maximum impact.",
+        title: `Resume Downloaded! ATS Score: ${score.overall}%`,
+        description: score.overall >= 80
+          ? "Excellent! Highly ATS-compatible format."
+          : "ATS-optimized PDF with professional formatting.",
       });
     } catch (error) {
       console.error('Download error:', error);
       toast({
         title: "Download Error",
         description: error instanceof Error ? error.message : "Failed to download resume. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Alternative: Download ATS-optimized version
-  const handleDownloadATSResume = async () => {
-    const resumeContent = editedResume || documents.resume;
-    if (!resumeContent) {
-      toast({
-        title: "No Resume Available",
-        description: "Please generate a resume first before downloading.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      console.log('🚀 Starting ATS-optimized resume download...');
-      console.log('📝 Using edited content:', !!editedResume);
-      const score = downloadATSResume(resumeContent);
-      setAtsScore(score);
-
-      toast({
-        title: `ATS Resume Downloaded! Score: ${score.overall}%`,
-        description: score.overall >= 80 
-          ? "Excellent! Highly ATS-compatible format."
-          : "Good ATS compatibility with detailed formatting.",
-      });
-    } catch (error) {
-      console.error('Download error:', error);
-      toast({
-        title: "Download Error",
-        description: error instanceof Error ? error.message : "Failed to download resume.",
         variant: "destructive",
       });
     }
@@ -540,14 +490,6 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
             <SparklesIcon className="w-4 h-4 mr-2" />
             {isGenerating ? "Generating..." : "Generate All Documents"}
           </Button>
-          <Button
-            onClick={() => testPDFGeneration()}
-            variant="outline"
-            size="sm"
-            className="ml-2"
-          >
-            Test PDF
-          </Button>
         </div>
         <div className="space-y-2">
           <CardDescription>
@@ -666,42 +608,15 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
                       <PrinterIcon className="w-3 h-3 mr-1" />
                       Print
                     </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white flex items-center gap-1"
-                        >
-                          <DownloadIcon className="w-3 h-3" />
-                          Download PDF
-                          <ChevronDownIcon className="w-3 h-3 ml-1" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem 
-                          onClick={() => handleDownloadResume()}
-                          className="cursor-pointer flex items-center gap-2 py-3"
-                        >
-                          <StarIcon className="w-4 h-4 text-amber-500" />
-                          <div>
-                            <div className="font-medium">Premium Single-Page</div>
-                            <div className="text-xs text-muted-foreground">Maximum visual impact, modern design</div>
-                          </div>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDownloadATSResume()}
-                          className="cursor-pointer flex items-center gap-2 py-3"
-                        >
-                          <CheckCircleIcon className="w-4 h-4 text-blue-500" />
-                          <div>
-                            <div className="font-medium">ATS-Optimized</div>
-                            <div className="text-xs text-muted-foreground">Best for automated screening systems</div>
-                          </div>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleDownloadResume()}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1"
+                    >
+                      <DownloadIcon className="w-3 h-3" />
+                      Download ATS PDF
+                    </Button>
                   </div>
                 </div>
                 <div className="border rounded-lg p-4 bg-white max-h-[600px] overflow-y-auto">

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { calculateATSScore, type ATSScore } from '@/utils/atsResumeGenerator';
+import { calculateATSScore, parseResumeContent, type ATSScore } from '@/utils/unifiedATSGenerator';
 
 interface ResumeRendererProps {
   content?: string;
@@ -7,497 +7,291 @@ interface ResumeRendererProps {
   showATSScore?: boolean;
 }
 
-interface ParsedSection {
-  type: 'summary' | 'skills' | 'experience' | 'education' | 'certifications' | 'projects' | 'additional';
-  title: string;
-  content: string[];
-}
-
-interface ParsedResume {
-  name: string;
-  title: string;
-  contact: string[];
-  sections: ParsedSection[];
-}
-
-// Clean markdown and special characters
-const cleanText = (text: string): string => {
-  if (!text) return '';
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/__(.*?)__/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/_(.*?)_/g, '$1')
-    .replace(/`(.*?)`/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/#+\s*/g, '')
-    .trim();
+const scoreColor = (score: number): string => {
+  if (score >= 80) return 'text-emerald-700 bg-emerald-50 border-emerald-200';
+  if (score >= 60) return 'text-amber-700 bg-amber-50 border-amber-200';
+  return 'text-red-700 bg-red-50 border-red-200';
 };
 
-// Check if content is non-English
-const isNonEnglish = (text: string): boolean => {
-  // Japanese
-  if (text.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/)) return true;
-  // Other non-ASCII heavy content
-  const nonAsciiRatio = (text.match(/[^\x00-\x7F]/g) || []).length / text.length;
-  return nonAsciiRatio > 0.3;
+const scoreBadgeColor = (score: number): string => {
+  if (score >= 80) return 'bg-emerald-100 text-emerald-800';
+  if (score >= 60) return 'bg-amber-100 text-amber-800';
+  return 'bg-red-100 text-red-800';
 };
 
-// Parse resume content into structured data
-const parseResume = (content: string): ParsedResume => {
-  const lines = content.split('\n').map(l => l.trim()).filter(l => l);
-  
-  const resume: ParsedResume = {
-    name: '',
-    title: '',
-    contact: [],
-    sections: []
-  };
+const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div>
+    <h3 className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-2 pb-1.5 border-b border-blue-100">
+      {title}
+    </h3>
+    {children}
+  </div>
+);
 
-  type SectionType = ParsedSection['type'];
-  
-  const sectionKeywords: { [key: string]: SectionType } = {
-    'summary': 'summary',
-    'professional summary': 'summary',
-    'profile': 'summary',
-    'objective': 'summary',
-    'about': 'summary',
-    'skills': 'skills',
-    'technical skills': 'skills',
-    'key skills': 'skills',
-    'core competencies': 'skills',
-    'technologies': 'skills',
-    'experience': 'experience',
-    'work experience': 'experience',
-    'professional experience': 'experience',
-    'employment': 'experience',
-    'employment history': 'experience',
-    'education': 'education',
-    'academic': 'education',
-    'academic background': 'education',
-    'certifications': 'certifications',
-    'certificates': 'certifications',
-    'licenses': 'certifications',
-    'projects': 'projects',
-    'key projects': 'projects',
-    'personal projects': 'projects',
-    'additional': 'additional',
-    'interests': 'additional',
-    'languages': 'additional',
-    'awards': 'additional',
-    'achievements': 'additional',
-    'publications': 'additional',
-    'research': 'additional'
-  };
-
-  // Non-English section headers
-  const nonEnglishSections: { [key: string]: SectionType } = {
-    // Japanese
-    '職歴': 'experience', '経歴': 'experience', '職歴要約': 'summary',
-    'スキル': 'skills', '技術スキル': 'skills',
-    '学歴': 'education', '資格': 'certifications',
-    // Spanish
-    'experiencia': 'experience', 'experiencia laboral': 'experience',
-    'habilidades': 'skills', 'competencias': 'skills',
-    'educación': 'education', 'formación': 'education',
-    // French
-    'expérience': 'experience', 'expérience professionnelle': 'experience',
-    'compétences': 'skills', 'formation': 'education',
-    // German
-    'berufserfahrung': 'experience', 'fähigkeiten': 'skills',
-    'ausbildung': 'education', 'zertifizierungen': 'certifications'
-  };
-
-  let currentSection: ParsedSection | null = null;
-  let inHeader = true;
-
-  const isContactLine = (line: string): boolean => {
-    return !!(
-      line.match(/@[\w.-]+\.\w+/) ||
-      line.match(/\+?\d[\d\s\-()]{7,}/) ||
-      line.match(/linkedin\.com/i) ||
-      line.match(/github\.com/i) ||
-      line.match(/\.(com|org|net|io|dev)/i) ||
-      line.match(/^(email|phone|tel|mobile|linkedin|github|website|portfolio|address|location):/i)
-    );
-  };
-
-  const getSectionType = (line: string): SectionType | null => {
-    const cleanLine = cleanText(line).toLowerCase().replace(/[:\-_]/g, '').trim();
-    
-    // Check English keywords
-    for (const [keyword, type] of Object.entries(sectionKeywords)) {
-      if (cleanLine === keyword || cleanLine.startsWith(keyword + ' ')) {
-        return type;
-      }
-    }
-    
-    // Check non-English keywords
-    for (const [keyword, type] of Object.entries(nonEnglishSections)) {
-      if (cleanLine === keyword || cleanLine.includes(keyword)) {
-        return type;
-      }
-    }
-    
-    // Check for ALL CAPS section headers
-    if (line === line.toUpperCase() && line.length > 3 && line.length < 50) {
-      const upperLine = cleanLine;
-      for (const [keyword, type] of Object.entries(sectionKeywords)) {
-        if (upperLine.includes(keyword)) {
-          return type;
-        }
-      }
-    }
-    
-    return null;
-  };
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const cleanLine = cleanText(line);
-
-    // Check for section header
-    const sectionType = getSectionType(line);
-    if (sectionType) {
-      if (currentSection && currentSection.content.length > 0) {
-        resume.sections.push(currentSection);
-      }
-      currentSection = {
-        type: sectionType,
-        title: cleanLine.toUpperCase(),
-        content: []
-      };
-      inHeader = false;
-      continue;
-    }
-
-    // Header section (name, title, contact)
-    if (inHeader) {
-      // First meaningful line is likely the name
-      if (!resume.name && cleanLine.length > 2 && cleanLine.length < 60 && !isContactLine(line)) {
-        resume.name = cleanLine;
-        continue;
-      }
-      
-      // Check for job title
-      if (!resume.title && cleanLine.match(/engineer|developer|manager|analyst|designer|architect|scientist|lead|senior|specialist|coordinator|director|consultant|intern|student|professional|associate/i)) {
-        resume.title = cleanLine;
-        continue;
-      }
-      
-      // Contact info
-      if (isContactLine(line)) {
-        resume.contact.push(cleanLine);
-        continue;
-      }
-      
-      // If we've collected enough header info, start sections
-      if (resume.name && (resume.contact.length > 0 || i > 6)) {
-        inHeader = false;
-      }
-    }
-
-    // Add content to current section
-    if (currentSection && cleanLine) {
-      currentSection.content.push(cleanLine);
-    } else if (!inHeader && cleanLine && !currentSection) {
-      // Content without a section header - create a general section
-      currentSection = {
-        type: 'summary',
-        title: 'PROFESSIONAL SUMMARY',
-        content: [cleanLine]
-      };
-    }
-  }
-
-  // Add last section
-  if (currentSection && currentSection.content.length > 0) {
-    resume.sections.push(currentSection);
-  }
-
-  return resume;
-};
-
-// Format content with highlighting
-const formatContent = (text: string): string => {
-  let formatted = text
-    // Bold markdown
-    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
-    // Email
-    .replace(/([\w.-]+@[\w.-]+\.\w+)/g, '<a href="mailto:$1" class="text-blue-600 hover:underline">$1</a>')
-    // URLs
-    .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="text-blue-600 hover:underline">$1</a>');
-  
-  return formatted;
-};
-
-// Get section icon based on type
-const getSectionIcon = (type: ParsedSection['type']): string => {
-  const icons: { [key: string]: string } = {
-    summary: '📋',
-    skills: '🛠️',
-    experience: '💼',
-    education: '🎓',
-    certifications: '🏆',
-    projects: '🚀',
-    additional: '📌'
-  };
-  return icons[type] || '📄';
-};
-
-// Get ATS score color
-const getScoreColor = (score: number): string => {
-  if (score >= 80) return 'text-green-600 bg-green-50 border-green-200';
-  if (score >= 60) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-  return 'text-red-600 bg-red-50 border-red-200';
-};
-
-const ResumeRenderer: React.FC<ResumeRendererProps> = ({ content, className = "", showATSScore = false }) => {
-  // Memoize parsing for performance
+const ResumeRenderer: React.FC<ResumeRendererProps> = ({ content, className = '', showATSScore = false }) => {
   const { resume, atsScore } = useMemo(() => {
     if (!content) return { resume: null, atsScore: null };
     return {
-      resume: parseResume(content),
-      atsScore: showATSScore ? calculateATSScore(content) : null
+      resume: parseResumeContent(content),
+      atsScore: showATSScore ? calculateATSScore(content) : null,
     };
   }, [content, showATSScore]);
 
-  // Handle empty content
   if (!content || !resume) {
     return (
-      <div className={`resume-content ${className}`}>
-        <div className="text-center py-12 text-gray-500">
-          <div className="text-4xl mb-4">📄</div>
-          <p className="text-lg font-medium">No resume content available</p>
-          <p className="text-sm mt-2">Generate a resume to see the preview</p>
-        </div>
+      <div className={`${className} flex flex-col items-center justify-center py-16 text-gray-400`}>
+        <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <p className="text-sm font-medium">No resume content</p>
+        <p className="text-xs mt-1">Generate a resume to preview it here</p>
       </div>
     );
   }
 
-  // Check if content is primarily non-English - use simple renderer
-  if (isNonEnglish(content)) {
-    return (
-      <div className={`resume-content ${className} max-w-4xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-8`}>
-        {/* ATS Score Badge */}
-        {atsScore && (
-          <div className={`mb-6 p-4 rounded-lg border ${getScoreColor(atsScore.overall)}`}>
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">ATS Score</span>
-              <span className="text-2xl font-bold">{atsScore.overall}%</span>
-            </div>
-          </div>
-        )}
-        
-        <div className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-          {content.split('\n').map((line, index) => {
-            const trimmedLine = line.trim();
-            if (!trimmedLine) return <br key={index} />;
-
-            // Section headers
-            if (trimmedLine.match(/^[A-Z\s]{4,}$/) || trimmedLine.match(/^(個人情報|職歴要約|技術スキル|職歴|学歴|資格|INFORMACIÓN PERSONAL|RESUMEN PROFESIONAL|COMPETENCIAS TÉCNICAS|EXPERIENCIA LABORAL|FORMACIÓN|IDIOMAS|INFORMATIONS PERSONNELLES|PROFIL PROFESSIONNEL|COMPÉTENCES TECHNIQUES|EXPÉRIENCE PROFESSIONNELLE|FORMATION|LANGUES|PERSÖNLICHE DATEN|BERUFSPROFIL|TECHNISCHE FÄHIGKEITEN|BERUFSERFAHRUNG|AUSBILDUNG|ZERTIFIZIERUNGEN)$/)) {
-              return (
-                <div key={index} className="font-bold text-lg mt-6 mb-3 text-blue-900 border-b-2 border-blue-200 pb-2">
-                  {trimmedLine}
-                </div>
-              );
-            }
-
-            // Name (first line)
-            if (index === 0) {
-              return (
-                <div key={index} className="font-bold text-2xl mb-2 text-center text-gray-900">
-                  {trimmedLine}
-                </div>
-              );
-            }
-
-            // Contact info
-            if (trimmedLine.match(/@|http|linkedin|github|tel:|phone:|email:|\+\d+/i)) {
-              return (
-                <div key={index} className="text-blue-600 text-center mb-1 text-sm">
-                  {trimmedLine}
-                </div>
-              );
-            }
-
-            // Bullet points
-            if (trimmedLine.match(/^[•·\-]\s/)) {
-              return (
-                <div key={index} className="ml-6 mb-2 flex items-start">
-                  <span className="text-blue-500 mr-2">•</span>
-                  <span>{trimmedLine.replace(/^[•·\-]\s*/, '')}</span>
-                </div>
-              );
-            }
-
-            // Job entries with dates
-            if (trimmedLine.match(/\|.*\d{4}/) || trimmedLine.match(/\d{4}\s*[-–]\s*(present|\d{4})/i)) {
-              return (
-                <div key={index} className="font-semibold mt-4 mb-2 text-gray-800">
-                  {trimmedLine}
-                </div>
-              );
-            }
-
-            return <div key={index} className="mb-1">{trimmedLine}</div>;
-          })}
-        </div>
-      </div>
-    );
-  }
+  const contactParts: string[] = [];
+  if (resume.contact.email) contactParts.push(resume.contact.email);
+  if (resume.contact.phone) contactParts.push(resume.contact.phone);
+  if (resume.contact.location) contactParts.push(resume.contact.location);
+  if (resume.contact.linkedin) contactParts.push(resume.contact.linkedin);
+  if (resume.contact.github) contactParts.push(resume.contact.github);
+  if (resume.contact.portfolio) contactParts.push(resume.contact.portfolio);
+  contactParts.push(...resume.contact.other);
 
   return (
     <div className={`resume-renderer ${className}`}>
-      {/* ATS Score Section */}
+      {/* ATS Score Panel */}
       {atsScore && (
-        <div className={`mb-6 p-4 rounded-lg border-2 ${getScoreColor(atsScore.overall)}`}>
+        <div className={`mb-5 rounded-lg border p-4 ${scoreColor(atsScore.overall)}`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">📊</span>
-              <span className="font-semibold text-lg">ATS Compatibility Score</span>
-            </div>
-            <div className="text-3xl font-bold">{atsScore.overall}%</div>
+            <span className="font-semibold text-sm">ATS Compatibility Score</span>
+            <span className={`text-lg font-bold px-3 py-0.5 rounded-full ${scoreBadgeColor(atsScore.overall)}`}>
+              {atsScore.overall}%
+            </span>
           </div>
-          
-          {/* Score Breakdown */}
-          <div className="grid grid-cols-5 gap-2 mb-3 text-xs">
-            <div className="text-center p-2 bg-white/50 rounded">
-              <div className="font-medium">Contact</div>
-              <div className="font-bold">{atsScore.sections.contactInfo}/20</div>
-            </div>
-            <div className="text-center p-2 bg-white/50 rounded">
-              <div className="font-medium">Skills</div>
-              <div className="font-bold">{atsScore.sections.skills}/25</div>
-            </div>
-            <div className="text-center p-2 bg-white/50 rounded">
-              <div className="font-medium">Experience</div>
-              <div className="font-bold">{atsScore.sections.experience}/30</div>
-            </div>
-            <div className="text-center p-2 bg-white/50 rounded">
-              <div className="font-medium">Education</div>
-              <div className="font-bold">{atsScore.sections.education}/15</div>
-            </div>
-            <div className="text-center p-2 bg-white/50 rounded">
-              <div className="font-medium">Format</div>
-              <div className="font-bold">{atsScore.sections.formatting}/10</div>
-            </div>
+          <div className="grid grid-cols-5 gap-2 text-xs mb-3">
+            {[
+              { label: 'Contact', val: atsScore.sections.contactInfo, max: 20 },
+              { label: 'Skills', val: atsScore.sections.skills, max: 25 },
+              { label: 'Experience', val: atsScore.sections.experience, max: 30 },
+              { label: 'Education', val: atsScore.sections.education, max: 15 },
+              { label: 'Format', val: atsScore.sections.formatting, max: 10 },
+            ].map(({ label, val, max }) => (
+              <div key={label} className="text-center rounded-md bg-white/60 p-1.5">
+                <div className="font-medium">{label}</div>
+                <div className="font-bold">{val}/{max}</div>
+                <div className="mt-1 h-1 rounded-full bg-white/40 overflow-hidden">
+                  <div className="h-full rounded-full bg-current opacity-40" style={{ width: `${(val / max) * 100}%` }} />
+                </div>
+              </div>
+            ))}
           </div>
-          
-          {/* Suggestions */}
           {atsScore.suggestions.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-current/20">
-              <div className="font-medium text-sm mb-2">💡 Suggestions to improve:</div>
-              <ul className="text-xs space-y-1">
-                {atsScore.suggestions.map((suggestion, i) => (
-                  <li key={i} className="flex items-start gap-1">
-                    <span>•</span>
-                    <span>{suggestion}</span>
-                  </li>
-                ))}
-              </ul>
+            <div className="pt-3 border-t border-current/10 text-xs space-y-1">
+              <p className="font-medium mb-1">Suggestions:</p>
+              {atsScore.suggestions.map((s, i) => (
+                <p key={i} className="flex gap-1.5"><span className="opacity-60">-</span><span>{s}</span></p>
+              ))}
             </div>
           )}
         </div>
       )}
 
-      {/* Resume Content */}
-      <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
-        {/* Header Section */}
-        <div className="bg-gradient-to-r from-blue-900 to-blue-700 text-white p-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-center mb-2">
+      {/* Resume Document */}
+      <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 bg-gradient-to-b from-slate-50 to-white border-b border-gray-100">
+          <h1 className="text-2xl font-bold text-gray-900 text-center leading-tight">
             {resume.name || 'Your Name'}
           </h1>
-          {resume.title && (
-            <p className="text-blue-100 text-center text-lg mb-3">
-              {resume.title}
-            </p>
-          )}
-          {resume.contact.length > 0 && (
-            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm text-blue-100">
-              {resume.contact.map((item, index) => (
-                <span 
-                  key={index}
-                  dangerouslySetInnerHTML={{ __html: formatContent(item) }}
-                  className="[&_a]:text-blue-200 [&_a]:hover:text-white"
-                />
+          {resume.title && <p className="text-sm text-gray-500 text-center mt-1">{resume.title}</p>}
+          {contactParts.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-x-2 gap-y-0.5 mt-2 text-xs text-gray-500">
+              {contactParts.map((item, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && <span className="text-gray-300">|</span>}
+                  <span>{item}</span>
+                </React.Fragment>
               ))}
             </div>
           )}
         </div>
 
-        {/* Content Sections */}
-        <div className="p-6 space-y-6">
-          {resume.sections.map((section, sectionIndex) => (
-            <div key={sectionIndex} className="resume-section">
-              {/* Section Header */}
-              <div className="flex items-center gap-2 mb-3 pb-2 border-b-2 border-blue-200">
-                <span className="text-lg">{getSectionIcon(section.type)}</span>
-                <h2 className="text-lg font-bold text-blue-900 uppercase tracking-wide">
-                  {section.title}
-                </h2>
-              </div>
-
-              {/* Section Content */}
-              <div className="space-y-2">
-                {section.content.map((item, itemIndex) => {
-                  const isBullet = item.startsWith('•') || item.startsWith('-') || item.startsWith('·');
-                  const isJobEntry = item.match(/\|.*\d{4}/) || item.match(/\d{4}\s*[-–]\s*(present|\d{4})/i);
-                  const isSkillCategory = item.includes(':') && section.type === 'skills';
-
-                  // Job entry with company/dates
-                  if (isJobEntry) {
-                    return (
-                      <div key={itemIndex} className="font-semibold text-gray-800 mt-4 first:mt-0">
-                        {item}
-                      </div>
-                    );
-                  }
-
-                  // Skill category
-                  if (isSkillCategory) {
-                    const [category, skills] = item.split(':');
-                    return (
-                      <div key={itemIndex} className="mb-2">
-                        <span className="font-semibold text-gray-700">{category}:</span>
-                        <span className="text-gray-600"> {skills}</span>
-                      </div>
-                    );
-                  }
-
-                  // Bullet point
-                  if (isBullet) {
-                    return (
-                      <div key={itemIndex} className="flex items-start gap-2 ml-2">
-                        <span className="text-blue-500 mt-1.5 text-xs">●</span>
-                        <span 
-                          className="text-gray-700 flex-1"
-                          dangerouslySetInnerHTML={{ __html: formatContent(item.replace(/^[•\-·]\s*/, '')) }}
-                        />
-                      </div>
-                    );
-                  }
-
-                  // Regular text
-                  return (
-                    <div 
-                      key={itemIndex} 
-                      className="text-gray-700"
-                      dangerouslySetInnerHTML={{ __html: formatContent(item) }}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-
-          {/* Empty state */}
-          {resume.sections.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <p>No sections found in the resume content.</p>
-              <p className="text-sm mt-2">The resume may need proper section headers like EXPERIENCE, SKILLS, EDUCATION.</p>
-            </div>
+        {/* Body */}
+        <div className="px-6 py-4 space-y-5">
+          {resume.summary.length > 0 && (
+            <Section title="Professional Summary">
+              <p className="text-sm text-gray-700 leading-relaxed">{resume.summary.join(' ')}</p>
+            </Section>
           )}
+
+          {resume.skills.length > 0 && (
+            <Section title="Technical Skills">
+              <div className="space-y-1.5">
+                {resume.skills.map((group, i) => (
+                  <div key={i} className="text-sm">
+                    {group.category && <span className="font-semibold text-gray-800">{group.category}: </span>}
+                    <span className="text-gray-600">{group.items.join(', ')}</span>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {resume.experience.length > 0 && (
+            <Section title="Professional Experience">
+              <div className="relative space-y-0">
+                {resume.experience.map((job, i) => (
+                  <div key={i} className="relative pl-4 pb-5 last:pb-0 group">
+                    {/* Timeline connector */}
+                    {i < resume.experience.length - 1 && (
+                      <div className="absolute left-[5px] top-3 bottom-0 w-px bg-gradient-to-b from-blue-300 to-blue-100" />
+                    )}
+                    {/* Timeline dot */}
+                    <div className="absolute left-0 top-[7px] w-[11px] h-[11px] rounded-full border-2 border-blue-400 bg-white group-hover:bg-blue-50 transition-colors" />
+
+                    {/* Job header */}
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                      <h4 className="font-semibold text-gray-900 text-sm leading-snug">{job.title}</h4>
+                      {job.dates && (
+                        <span className="inline-flex items-center text-[11px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full whitespace-nowrap">
+                          {job.dates}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Company & location */}
+                    {job.company && (
+                      <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                        <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        <span className="italic">{job.company}{job.location ? ` \u2022 ${job.location}` : ''}</span>
+                      </p>
+                    )}
+
+                    {/* Bullet points */}
+                    {job.bullets.length > 0 && (
+                      <ul className="mt-2 space-y-1.5">
+                        {job.bullets.map((bullet, bi) => (
+                          <li key={bi} className="flex gap-2 text-sm text-gray-700 leading-relaxed">
+                            <span className="text-blue-400 mt-[7px] w-1.5 h-1.5 rounded-full bg-blue-300 flex-shrink-0" />
+                            <span>{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {resume.education.length > 0 && (
+            <Section title="Education">
+              <div className="space-y-3">
+                {resume.education.map((edu, i) => (
+                  <div key={i}>
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                      <h4 className="font-semibold text-gray-900 text-sm">{edu.degree}</h4>
+                      {edu.dates && (
+                        <span className="inline-flex items-center text-[11px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full whitespace-nowrap">
+                          {edu.dates}
+                        </span>
+                      )}
+                    </div>
+                    {edu.school && (
+                      <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                        <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path d="M12 14l9-5-9-5-9 5 9 5z" />
+                          <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
+                        </svg>
+                        <span className="italic">{edu.school}</span>
+                      </p>
+                    )}
+                    {edu.details.length > 0 && (
+                      <ul className="mt-1 space-y-0.5">
+                        {edu.details.map((d, di) => (
+                          <li key={di} className="text-xs text-gray-600 flex gap-1.5">
+                            <span className="text-gray-300">-</span><span>{d}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {resume.certifications.length > 0 && (
+            <Section title="Certifications">
+              <ul className="space-y-1">
+                {resume.certifications.map((cert, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-gray-700">
+                    <span className="text-blue-400 mt-[7px] w-1.5 h-1.5 rounded-full bg-blue-300 flex-shrink-0" />
+                    <span>{cert}</span>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
+
+          {resume.projects.length > 0 && (
+            <Section title="Key Projects">
+              <div className="grid gap-3">
+                {resume.projects.map((proj, i) => (
+                  <div key={i} className="rounded-md border border-gray-100 bg-gray-50/50 px-3 py-2.5">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <h4 className="font-semibold text-gray-900 text-sm">{proj.name}</h4>
+                    </div>
+                    {proj.description && <p className="text-sm text-gray-600 mt-0.5">{proj.description}</p>}
+                    {proj.technologies && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {proj.technologies.split(/[,;]/).map((t, ti) => (
+                          <span key={ti} className="inline-block text-[10px] font-medium text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
+                            {t.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {proj.bullets.length > 0 && (
+                      <ul className="mt-1.5 space-y-0.5">
+                        {proj.bullets.map((b, bi) => (
+                          <li key={bi} className="flex gap-2 text-sm text-gray-700">
+                            <span className="text-blue-400 mt-[7px] w-1.5 h-1.5 rounded-full bg-blue-300 flex-shrink-0" />
+                            <span>{b}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {resume.additional.length > 0 && (
+            <Section title="Additional Information">
+              <ul className="space-y-1">
+                {resume.additional.map((item, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-gray-700">
+                    <span className="text-blue-400 mt-1.5 text-[6px] leading-none flex-shrink-0">&#9679;</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
+
+          {resume.summary.length === 0 && resume.skills.length === 0 &&
+            resume.experience.length === 0 && resume.education.length === 0 && (
+              <div className="text-center py-8 text-gray-400 text-sm">
+                <p>No structured sections found.</p>
+                <p className="mt-1 text-xs">Ensure your resume has sections like EXPERIENCE, SKILLS, EDUCATION.</p>
+              </div>
+            )}
         </div>
       </div>
     </div>

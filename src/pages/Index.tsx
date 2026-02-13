@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileTextIcon, SparklesIcon } from "lucide-react";
+import { FileTextIcon, SparklesIcon, GithubIcon, Loader2Icon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ResumeUpload from "@/components/ResumeUpload";
 import ResumeViewer from "@/components/ResumeViewer";
@@ -16,6 +16,7 @@ import DocumentGenerator from "@/components/DocumentGenerator";
 import { generateResumeWithAI } from "@/services/geminiAI";
 import { getUserEnvVarAsync, setUserEnvVarAsync, enableDemoMode, disableDemoMode, isDemoModeEnabled } from '../services/env';
 import { Settings2Icon } from 'lucide-react';
+import { buildSampleResume, SAMPLE_JOB_DESCRIPTION } from '@/utils/sampleData';
 
 const REQUIRED_KEYS = [
   { key: 'VITE_GEMINI_API_KEY', label: 'Gemini API Key' },
@@ -39,6 +40,7 @@ const Index = () => {
   const [applications, setApplications] = useState<any[]>([]);
   const [selectedApplication, setSelectedApplication] = useState<any>(null);
   const [showResumeModal, setShowResumeModal] = useState(false);
+  const [isLoadingSample, setIsLoadingSample] = useState(false);
   const { toast } = useToast();
 
   // Load applications from localStorage
@@ -211,6 +213,35 @@ const Index = () => {
     toast({
       title: "Data Cleared",
       description: "All job details and generated resume have been cleared.",
+    });
+  };
+
+  const handleLoadSampleResume = async () => {
+    setIsLoadingSample(true);
+    try {
+      const sampleResume = await buildSampleResume();
+      setBaseResume(sampleResume);
+      toast({
+        title: "Sample Resume Loaded",
+        description: "Resume pre-filled with real GitHub projects. You can now generate documents!",
+      });
+    } catch (err) {
+      console.error('Failed to load sample resume:', err);
+      toast({
+        title: "Sample Resume Loaded",
+        description: "Pre-filled with sample resume data (GitHub projects may be cached).",
+      });
+    } finally {
+      setIsLoadingSample(false);
+    }
+  };
+
+  const handleLoadSampleJob = () => {
+    setJobDetails(SAMPLE_JOB_DESCRIPTION);
+    localStorage.setItem("jobDetails", SAMPLE_JOB_DESCRIPTION);
+    toast({
+      title: "Sample Job Description Loaded",
+      description: "Pre-filled with a Senior Full Stack Developer job posting.",
     });
   };
 
@@ -400,6 +431,51 @@ const Index = () => {
               <div className="space-y-6">
                 {/* Resume Upload Section */}
                 <ResumeUpload onResumeUpdate={handleBaseResumeUpdate} />
+
+                {/* Sample Resume Quick-Start */}
+                <Card className="border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50">
+                  <CardContent className="pt-5 pb-4">
+                    <div className="flex items-start gap-3">
+                      <GithubIcon className="w-5 h-5 text-indigo-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-indigo-800 text-sm mb-1">Quick Start with Sample Resume</h3>
+                        <p className="text-indigo-700 text-xs mb-3">
+                          Pre-fill with a real resume enriched with projects fetched live from GitHub.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isLoadingSample}
+                            onClick={handleLoadSampleResume}
+                            className="border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+                          >
+                            {isLoadingSample ? (
+                              <>
+                                <Loader2Icon className="w-3 h-3 mr-1 animate-spin" />
+                                Fetching GitHub Projects...
+                              </>
+                            ) : (
+                              <>
+                                <GithubIcon className="w-3 h-3 mr-1" />
+                                Use Sample Resume
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleLoadSampleJob}
+                            className="border-purple-300 text-purple-700 hover:bg-purple-100"
+                          >
+                            <FileTextIcon className="w-3 h-3 mr-1" />
+                            Use Sample Job Description
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
                 
                 <div className="space-y-6">
                   {/* Language Selector */}
