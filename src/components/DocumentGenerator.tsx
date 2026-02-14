@@ -25,7 +25,7 @@ import EnhancedPrintManager from "@/components/EnhancedPrintManager";
 import PWADownloadPrompt from "@/components/PWADownloadPrompt";
 import { createCleanPrintWindow } from "@/utils/printUtils";
 import { downloadCoverLetterAsPDF, downloadEmailAsPDF } from "@/utils/resumeDownloader";
-import { downloadATSResume, calculateATSScore, type ATSScore } from "@/utils/unifiedATSGenerator";
+import { downloadATSResume, calculateATSScore, extractFileNameParts, type ATSScore } from "@/utils/unifiedATSGenerator";
 
 interface DocumentGeneratorProps {
   jobDescription: string;
@@ -296,7 +296,9 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      const score = downloadATSResume(resumeContent, 'resume-ats-optimized.pdf');
+      const { name, company } = extractFileNameParts(resumeContent, jobDescription);
+      const pdfName = company ? `${name}_${company}_resume.pdf` : `${name}_resume.pdf`;
+      const score = downloadATSResume(resumeContent, pdfName);
       setAtsScore(score);
 
       toast({
@@ -326,7 +328,10 @@ const DocumentGenerator: React.FC<DocumentGeneratorProps> = ({
     }
 
     try {
-      downloadCoverLetterAsPDF(documents.coverLetter);
+      const resumeContent = editedResume || documents.resume || '';
+      const { name, company } = extractFileNameParts(resumeContent, jobDescription);
+      const clName = company ? `${name}_${company}_cover_letter.pdf` : `${name}_cover_letter.pdf`;
+      downloadCoverLetterAsPDF(documents.coverLetter, clName);
 
       toast({
         title: "Cover Letter Downloaded Successfully!",

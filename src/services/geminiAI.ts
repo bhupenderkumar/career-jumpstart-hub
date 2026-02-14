@@ -563,7 +563,23 @@ export const generateAllDocuments = async ({
 2. **Section Headers:** ALL CAPS (${langGuidelines.sections}).
 3. **Tech Skills:** Group by category (Programming Languages, Frameworks, etc.). Format: "Category: Technology1, Technology2". Prioritize job-required skills.
 4. **ATS Optimization:** Action verbs, quantified achievements ("improved performance by 30%"), bold keywords, bullet points (•).
-5. **Professional Formatting:** Job titles ("Position | Company | Dates"), bullet points for achievements, concise descriptions, emphasize results.
+5. **Professional Formatting:** Job titles MUST use this EXACT format: "Position | Company, Location | Dates". Each achievement must be on its OWN line starting with •.
+
+**CRITICAL EXPERIENCE FORMAT - FOLLOW EXACTLY:**
+Each job MUST be formatted as:
+\`\`\`
+Job Title | Company Name, Location | Mon YYYY - Mon YYYY
+• Achievement 1 - one sentence per bullet
+• Achievement 2 - one sentence per bullet
+• Achievement 3 - one sentence per bullet
+\`\`\`
+- Use PIPE (|) separators between title, company, and dates
+- Each bullet point (•) MUST be on its own separate line
+- NEVER combine multiple achievements into one bullet point
+- NEVER use sub-bullets or nested lists
+- Each bullet should start with a strong action verb
+- Keep each bullet to 1-2 lines maximum
+- DO NOT put all achievements in a single paragraph or single bullet
 
 **LANGUAGE & CULTURAL GUIDELINES:**
 - **Format:** ${langGuidelines.format}
@@ -573,6 +589,13 @@ export const generateAllDocuments = async ({
 - **Section Order:** ${langGuidelines.sections}
 ${langGuidelines.languageNote ? `- **LANGUAGE REQUIREMENT:** ${langGuidelines.languageNote}` : ''}
 ${langGuidelines.example ? `- **FORMAT EXAMPLE:** ${langGuidelines.example}` : ''}
+
+**ABSOLUTELY FORBIDDEN - DO NOT INCLUDE:**
+- NO commentary, notes, or explanations after the resume content
+- NO text like "This resume is optimized for..." or "Key changes made..."
+- NO meta-commentary about the resume itself
+- NO "Note:", "Disclaimer:", or "Summary of changes:" sections
+- Output ONLY the resume content itself — nothing before or after it
 `;
 
     let prompts: { [key: string]: string } = {};
@@ -878,7 +901,9 @@ REMINDER: Write the entire response in ${language === 'ja' ? 'Japanese' : langua
         }
 
         if (type === 'resume') {
-          result.resume = content;
+          // Strip any LLM commentary/notes appended after the actual resume
+          const { stripLLMCommentary } = await import('@/utils/unifiedATSGenerator');
+          result.resume = stripLLMCommentary(content);
 
           // Always validate employment information preservation
           const validation = validateEmploymentPreservation(effectiveResume, content);
@@ -890,7 +915,8 @@ REMINDER: Write the entire response in ${language === 'ja' ? 'Japanese' : langua
             console.log('✅ Employment information preserved successfully');
           }
         } else if (type === 'coverLetter') {
-          result.coverLetter = content;
+          const { stripLLMCommentary } = await import('@/utils/unifiedATSGenerator');
+          result.coverLetter = stripLLMCommentary(content);
         } else if (type === 'email') {
           result.email = content;
         }

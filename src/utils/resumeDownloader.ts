@@ -512,7 +512,7 @@ export const downloadResumeAsPDF = async (resumeContent: string): Promise<void> 
 };
 
 // Cover Letter PDF Generator
-export const downloadCoverLetterAsPDF = (coverLetterContent: string): void => {
+export const downloadCoverLetterAsPDF = (coverLetterContent: string, fileName?: string): void => {
   try {
     const pdf = new jsPDF();
     const pageWidth = pdf.internal.pageSize.width;
@@ -553,10 +553,9 @@ export const downloadCoverLetterAsPDF = (coverLetterContent: string): void => {
       }
     });
 
-    // Generate filename with timestamp
-    const timestamp = new Date().toISOString().slice(0, 10);
-    const filename = `cover_letter_${timestamp}.pdf`;
-    pdf.save(filename);
+    // Generate filename
+    const finalName = fileName || `cover_letter_${new Date().toISOString().slice(0, 10)}.pdf`;
+    pdf.save(finalName);
 
   } catch (error) {
     console.error('Error generating cover letter PDF:', error);

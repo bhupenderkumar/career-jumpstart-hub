@@ -166,38 +166,182 @@ const isContactLine = (line: string): boolean => !!(
   line.match(/^(email|phone|tel|mobile|linkedin|github|website|portfolio|address|location):/i)
 );
 
-const isJobEntry = (line: string): boolean => !!(
-  (line.includes('|') && line.match(/\d{4}/)) ||
-  line.match(/\d{4}\s*[-–—]\s*(present|\d{4})/i) ||
-  line.match(/^[\w\s,]+\s+(at|@)\s+[\w\s,]+/)
-);
+/** Extracts a date range from a line if present */
+const extractDateRange = (line: string): string | null => {
+  // "Jun 2021 - Present", "2018-2021", "Jan 2020 – Dec 2023", "(2019 - 2022)", "Sep 2018 - May 2021"
+  const m = line.match(
+    /(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?\d{4}\s*[-–—]\s*(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:\d{4}|[Pp]resent|[Cc]urrent|[Nn]ow|[Oo]ngoing)/
+  );
+  return m ? m[0].trim() : null;
+};
+
+const isJobEntry = (line: string): boolean => {
+  const stripped = line.replace(/^[•\-*]\s*/, '');
+  // 1. Pipe-separated with year: "Title | Company | Dates"
+  if (stripped.includes('|') && /\d{4}/.test(stripped)) return true;
+  // 2. Date range pattern anywhere: "2021 - Present", "Jun 2018 - May 2021"
+  if (extractDateRange(stripped)) {
+    // Make sure it's not just a bullet about a date (short text with date range is a header)
+    const withoutDate = stripped.replace(
+      /(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?\d{4}\s*[-–—]\s*(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:\d{4}|[Pp]resent|[Cc]urrent|[Nn]ow|[Oo]ngoing)/g, ''
+    ).replace(/[()|\-–—,]/g, '').trim();
+    // If the remaining text (minus date) is short enough, it's a job header not a long bullet
+    if (withoutDate.length < 120) return true;
+  }
+  // 3. "at/@ Company" pattern: "Senior Engineer at Lab49"
+  if (/^[\w\s,]+\s+(?:at|@)\s+[\w\s,]+/.test(stripped)) return true;
+  // 4. Parenthesized dates: "Title, Company (Jun 2021 - Present)"
+  if (/\(\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+)?\d{4}\s*[-–—]/i.test(stripped)) return true;
+  return false;
+};
 
 const extractJobInfo = (line: string): { title: string; company: string; dates: string; location: string } => {
-  // Pattern: Title | Company | Dates  OR  Title | Company, Location | Dates
-  const pipeMatch = line.match(/^(.+?)\s*\|\s*(.+?)\s*\|\s*(.+)$/);
+  const stripped = line.replace(/^[•\-*]\s*/, '');
+  const dates = extractDateRange(stripped) || '';
+
+  // Pattern 1: Pipe-separated — "Title | Company | Dates" or "Title | Company, Location | Dates"
+  const pipeMatch = stripped.match(/^(.+?)\s*\|\s*(.+?)\s*\|\s*(.+)$/);
   if (pipeMatch) {
     const [, first, second, third] = pipeMatch;
-    // If there's a 4th pipe segment, use it
     const remaining = third.split('|').map(s => s.trim());
     if (remaining.length >= 2) {
-      return {
-        title: first.trim(),
-        company: second.trim(),
-        location: '',
-        dates: remaining[remaining.length - 1],
-      };
+      return { title: first.trim(), company: second.trim(), location: '', dates: remaining[remaining.length - 1] };
     }
     return { title: first.trim(), company: second.trim(), dates: third.trim(), location: '' };
   }
-  // Pattern with dash and year
-  const dashMatch = line.match(/^(.+?)\s*[-–—]\s*(.+?)\s*,?\s*(\d{4}.*)$/);
+
+  // Pattern 2: "Title - Company, Dates" or "Title – Company | Dates"
+  const dashMatch = stripped.match(/^(.+?)\s*[-–—]\s*(.+?)\s*,?\s*(\d{4}.*)$/);
   if (dashMatch) {
     return { title: dashMatch[1].trim(), company: dashMatch[2].trim(), dates: dashMatch[3].trim(), location: '' };
   }
-  return { title: line, company: '', dates: '', location: '' };
+
+  // Pattern 3: Parenthesized dates — "Title, Company (Jun 2021 - Present)"
+  const parenMatch = stripped.match(/^(.+?)\s*\(([^)]*\d{4}[^)]*)\)\s*$/);
+  if (parenMatch) {
+    const titleCompany = parenMatch[1].replace(/,\s*$/, '').trim();
+    const parenDates = parenMatch[2].trim();
+    // Try to split "Title, Company" or "Title at Company"
+    const atSplit = titleCompany.match(/^(.+?)\s+(?:at|@)\s+(.+)$/i);
+    if (atSplit) return { title: atSplit[1].trim(), company: atSplit[2].trim(), dates: parenDates, location: '' };
+    const commaSplit = titleCompany.match(/^(.+?),\s+(.+)$/);
+    if (commaSplit) return { title: commaSplit[1].trim(), company: commaSplit[2].trim(), dates: parenDates, location: '' };
+    return { title: titleCompany, company: '', dates: parenDates, location: '' };
+  }
+
+  // Pattern 4: "Title at/@ Company Dates"
+  const atMatch = stripped.match(/^(.+?)\s+(?:at|@)\s+(.+?)(?:\s*,?\s*(\d{4}.*))?$/i);
+  if (atMatch) {
+    return { title: atMatch[1].trim(), company: atMatch[2].trim(), dates: atMatch[3]?.trim() || dates, location: '' };
+  }
+
+  // Pattern 5: If line has dates, strip them and use the rest as title
+  if (dates) {
+    const withoutDates = stripped.replace(dates, '').replace(/[|,]\s*$/, '').replace(/^\s*[|,]/, '').trim();
+    // Check for comma-separated: "Title, Company"
+    const parts = withoutDates.split(/,\s*/);
+    if (parts.length >= 2) {
+      return { title: parts[0].trim(), company: parts.slice(1).join(', ').trim(), dates, location: '' };
+    }
+    return { title: withoutDates, company: '', dates, location: '' };
+  }
+
+  return { title: stripped, company: '', dates: '', location: '' };
 };
 
 // ────────────────────── Resume Parser ──────────────────────
+
+/**
+ * Splits a long bullet that contains multiple concatenated sentences into separate bullets.
+ * e.g. "Led development of X. Built Y. Improved Z by 30%." → ["Led development of X", "Built Y", "Improved Z by 30%"]
+ */
+const splitLongBullet = (bullet: string): string[] => {
+  if (!bullet || bullet.length < 80) return [bullet];
+  
+  // Action verbs that typically start a new bullet point
+  const actionVerbPattern = /\.\s+(Led|Built|Designed|Developed|Implemented|Managed|Created|Architected|Automated|Improved|Reduced|Increased|Delivered|Deployed|Optimized|Collaborated|Resolved|Established|Maintained|Integrated|Spearheaded|Streamlined|Coordinated|Orchestrated|Mentored|Configured|Migrated|Executed|Enhanced|Scaled|Secured|Refactored|Generated|Oversaw|Performed|Planned|Presented|Produced|Provided|Transformed|Upgraded|Analyzed|Supervised|Supported|Tested|Trained|Achieved|Administered|Documented|Expanded|Initiated|Launched|Monitored|Organized|Simplified)\b/g;
+  
+  let match;
+  const splitPoints: number[] = [];
+  while ((match = actionVerbPattern.exec(bullet)) !== null) {
+    splitPoints.push(match.index + 1); // +1 to skip the period
+  }
+  
+  if (splitPoints.length === 0) return [bullet];
+  
+  const parts: string[] = [];
+  let lastIdx = 0;
+  for (const idx of splitPoints) {
+    const part = bullet.substring(lastIdx, idx).trim().replace(/\.\s*$/, '').trim();
+    if (part.length > 10) parts.push(part);
+    lastIdx = idx;
+  }
+  const lastPart = bullet.substring(lastIdx).trim().replace(/\.\s*$/, '').trim();
+  if (lastPart.length > 10) parts.push(lastPart);
+  
+  return parts.length > 0 ? parts : [bullet];
+};
+
+/**
+ * Strips LLM commentary/notes from resume content.
+ * AI models often add meta-commentary like "This resume is optimized for..." at the end.
+ */
+export const stripLLMCommentary = (content: string): string => {
+  if (!content) return '';
+  // Patterns that match common LLM commentary paragraphs
+  const commentaryPatterns = [
+    /\n\n(?:Note|Disclaimer|Explanation|Commentary|Summary of changes|Key changes|Changes made|This resume|I have|I've|The above|Please note|Here's|Here is|Important)\s*[:.].*$/is,
+    /\n\n(?:This (?:resume|CV|cover letter|document) (?:is|has been|was) (?:optimized|tailored|crafted|designed|written|updated|enhanced|created)).*$/is,
+    /\n\n(?:Key (?:highlights|changes|modifications|improvements|optimizations|adjustments))\s*[:.].*$/is,
+    // Only strip --- separators when they appear at the end and are followed by commentary (not resume content)
+    /\n\n---\s*\n+(?:Note|Disclaimer|This|Key|I |I'|The above|Please|Here|Important).*$/is,
+    /\n\n\*\*(?:Note|Key changes|Changes|Summary of).*$/is,
+  ];
+  let cleaned = content;
+  for (const pattern of commentaryPatterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+  return cleaned.trim();
+};
+
+/**
+ * Extracts candidate name and target company from resume content and job description.
+ * Used for generating meaningful filenames like "name_company.pdf"
+ */
+export const extractFileNameParts = (resumeContent: string, jobDescription?: string): { name: string; company: string } => {
+  const resume = parseResumeContent(resumeContent);
+  // Clean name: lowercase, replace spaces with underscores, remove special chars
+  const rawName = (resume.name || 'resume').trim();
+  const name = rawName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/gi, '')
+    .replace(/\s+/g, '_')
+    .substring(0, 30);
+
+  let company = '';
+  if (jobDescription) {
+    // Try to extract company name from job description
+    const companyPatterns = [
+      /(?:company|employer|organization|firm)\s*[:.]\s*([^\n,]+)/i,
+      /(?:at|for|with|join)\s+([A-Z][A-Za-z0-9&. ]{1,30})(?:\s*[,\n]|$)/m,
+      /^([A-Z][A-Za-z0-9&. ]{1,30})\s+(?:is|are|seeks|looking)/m,
+      /(?:about|join)\s+([A-Z][A-Za-z0-9& ]{1,25})(?:[.!,]|\s+and)/,
+    ];
+    for (const pattern of companyPatterns) {
+      const match = jobDescription.match(pattern);
+      if (match && match[1]) {
+        company = match[1].trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/gi, '')
+          .replace(/\s+/g, '_')
+          .substring(0, 25);
+        break;
+      }
+    }
+  }
+
+  return { name: name || 'resume', company };
+};
 
 /** Returns true for lines that are purely decorative separators (---, ===, ***, etc.) */
 const isDecorativeLine = (line: string): boolean => {
@@ -213,7 +357,19 @@ const isDecorativeLine = (line: string): boolean => {
 };
 
 export const parseResumeContent = (content: string): ParsedResume => {
-  const rawLines = content.split('\n').map(l => cleanMarkdown(l)).filter(l => l && !isDecorativeLine(l));
+  // Pre-process: split on newlines AND on inline bullet markers (AI sometimes puts multiple • on one line)
+  const preSplit = content.split('\n').flatMap(line => {
+    // If a line contains multiple bullet markers, split them into separate lines
+    // But don't split if bullets are inside a "Technologies:" or pipe-separated header
+    if (line.includes('|') && /\d{4}/.test(line)) return [line]; // Keep job headers intact
+    if (/:\s/.test(line) && !line.match(/^[\s]*[•●◦○⚬►▸▹\-*]\s/)) return [line]; // Keep "Category: items" intact
+    // Split on bullet markers that appear after other content (mid-line bullets)
+    const parts = line.split(/(?<=\S)\s+(?=[•●◦○⚬►▸▹]\s)/);
+    if (parts.length > 1) return parts;
+    // Also split on " - " when preceded by period and followed by capital letter (sentence boundaries)
+    return [line];
+  });
+  const rawLines = preSplit.map(l => cleanMarkdown(l)).filter(l => l && !isDecorativeLine(l));
 
   const resume: ParsedResume = {
     name: '', title: '',
@@ -249,41 +405,60 @@ export const parseResumeContent = (content: string): ParsedResume => {
     // ── Route content to correct section ──
     switch (currentSection) {
       case 'header': {
-        if (!resume.name && !isContactLine(line) && line.length < 60) {
+        // Helper: extract all contact info from a single part
+        const extractContactFromPart = (part: string): boolean => {
+          const email = part.match(/[\w.-]+@[\w.-]+\.\w+/);
+          const phone = part.match(/\+?\d[\d\s\-()]{8,}/);
+          const linkedin = part.match(/linkedin\.com\/in\/[\w-]+/i);
+          const github = part.match(/github\.com\/[\w-]+/i);
+          if (email && !resume.contact.email) { resume.contact.email = email[0]; return true; }
+          if (phone && !resume.contact.phone) { resume.contact.phone = phone[0].replace(/\s+/g, ' ').trim(); return true; }
+          if (linkedin && !resume.contact.linkedin) { resume.contact.linkedin = linkedin[0]; return true; }
+          if (github && !resume.contact.github) { resume.contact.github = github[0]; return true; }
+          if (part.match(/\.(com|org|net|io|dev)/i) && !resume.contact.portfolio) { resume.contact.portfolio = part; return true; }
+          return false;
+        };
+
+        // Helper: check if a string is only a name (no contact info, no section keywords)
+        const isNameCandidate = (text: string): boolean => {
+          if (text.length > 60 || text.length < 2) return false;
+          if (isContactLine(text)) return false;
+          // Mostly letters, spaces, dots, hyphens (name characters)
+          if (!/^[A-Za-zÀ-ÖØ-öø-ÿ\s.\-']+$/.test(text)) return false;
+          return true;
+        };
+
+        if (line.includes('|') || line.includes('•')) {
+          // Pipe/bullet-separated line — could contain name + contact or just contact
+          const parts = line.split(/[|•]/).map(p => p.trim()).filter(Boolean);
+          for (const part of parts) {
+            const wasContact = extractContactFromPart(part);
+            if (!wasContact) {
+              // Not contact info — could be name, title, or location
+              if (!resume.name && isNameCandidate(part)) {
+                resume.name = part;
+              } else if (!resume.title && part.length < 100 &&
+                part.match(/engineer|developer|manager|analyst|designer|architect|scientist|lead|senior|specialist|coordinator|director|consultant|intern|student|professional|associate/i)) {
+                resume.title = part;
+              } else if (!resume.contact.location && part.length < 50 &&
+                part.match(/\b(india|usa|uk|canada|australia|germany|france|noida|delhi|gurugram|gurgaon|bengaluru|bangalore|mumbai|hyderabad|pune|chennai|new york|san francisco|london|remote|city|state|street)\b/i)) {
+                resume.contact.location = part;
+              }
+            }
+          }
+        } else if (!resume.name && !isContactLine(line) && line.length < 60) {
           resume.name = line;
         } else if (!resume.title && line.length < 100 &&
           line.match(/engineer|developer|manager|analyst|designer|architect|scientist|lead|senior|specialist|coordinator|director|consultant|intern|student|professional|associate/i)) {
           resume.title = line;
         } else if (isContactLine(line)) {
-          const email = line.match(/[\w.-]+@[\w.-]+\.\w+/);
-          const phone = line.match(/\+?\d[\d\s\-()]{8,}/);
-          const linkedin = line.match(/linkedin\.com\/in\/[\w-]+/i);
-          const github = line.match(/github\.com\/[\w-]+/i);
-          if (email) resume.contact.email = email[0];
-          if (phone) resume.contact.phone = phone[0].replace(/\s+/g, ' ').trim();
-          if (linkedin) resume.contact.linkedin = linkedin[0];
-          if (github) resume.contact.github = github[0];
-          if (!email && !phone && !linkedin && !github) {
-            if (line.match(/\.(com|org|net|io|dev)/i)) {
-              resume.contact.portfolio = line;
-            } else if (!resume.contact.location && line.length < 80) {
-              resume.contact.location = line;
-            }
-          }
-        } else if (line.includes('|') || line.includes('•')) {
-          // Contact line with separators
-          const parts = line.split(/[|•]/).map(p => p.trim()).filter(Boolean);
-          for (const part of parts) {
-            const email = part.match(/[\w.-]+@[\w.-]+\.\w+/);
-            const phone = part.match(/\+?\d[\d\s\-()]{8,}/);
-            const linkedin = part.match(/linkedin\.com\/in\/[\w-]+/i);
-            const github = part.match(/github\.com\/[\w-]+/i);
-            if (email && !resume.contact.email) resume.contact.email = email[0];
-            else if (phone && !resume.contact.phone) resume.contact.phone = phone[0].replace(/\s+/g, ' ').trim();
-            else if (linkedin && !resume.contact.linkedin) resume.contact.linkedin = linkedin[0];
-            else if (github && !resume.contact.github) resume.contact.github = github[0];
-            else if (part.match(/\.(com|org|net|io|dev)/i) && !resume.contact.portfolio) resume.contact.portfolio = part;
-            else if (!resume.contact.location && part.length < 50) resume.contact.location = part;
+          // Line with contact info — also try to extract name from it
+          // e.g. "John Smith rajus9231@gmail.com +91 9717267473"
+          extractContactFromPart(line);
+          if (!resume.contact.location && !line.match(/@/) && !line.match(/\d{5,}/) && line.length < 80 &&
+            !line.match(/\.(com|org|net|io|dev)/i)) {
+            // Pure location line like "New Delhi, India"
+            resume.contact.location = line;
           }
         }
         break;
@@ -320,11 +495,33 @@ export const parseResumeContent = (content: string): ParsedResume => {
           const info = extractJobInfo(line);
           curExp = { ...info, bullets: [] };
         } else if (curExp) {
-          const bullet = line.replace(/^[•\-*]\s*/, '');
-          if (bullet) curExp.bullets.push(bullet);
+          const bullet = line.replace(/^[•\-*]\s*/, '').trim();
+          if (!bullet) break;
+          // Check if company/dates info is on a separate line right after title
+          if (curExp.bullets.length === 0 && !curExp.company && !curExp.dates) {
+            // Maybe this line has the company name or dates
+            const dateRange = extractDateRange(bullet);
+            if (dateRange && bullet.replace(dateRange, '').replace(/[(),|•\- ]/g, '').length < 5) {
+              // Line is essentially just a date range
+              curExp.dates = dateRange;
+              break;
+            }
+            // If line looks like a company (no action verbs, short, might have location)
+            if (bullet.length < 80 && !bullet.match(/^(Led|Built|Designed|Developed|Implemented|Managed|Created|Architected|Automated|Improved|Reduced|Increased|Delivered|Deployed|Optimized|Collaborated|Resolved|Established|Maintained|Integrated|Spearheaded|Streamlined|Coordinated|Orchestrated|Mentored|Configured|Migrated|Executed|Enhanced|Scaled|Secured|Refactored|Generated|Oversaw|Performed|Planned|Presented|Produced|Provided|Transformed|Upgraded|Analyzed|Supervised|Supported|Tested|Trained)/i)) {
+              if (bullet.match(/\b(inc|ltd|llc|corp|company|technologies|services|group|labs?|solutions|consulting|systems|digital|software|india|noida|delhi|gurugram|gurgaon|bengaluru|bangalore|mumbai|hyderabad|pune|chennai|new york|san francisco|london)\b/i)) {
+                curExp.company = bullet.replace(/,?\s*\d{4}.*/, '').trim();
+                const lineDate = extractDateRange(bullet);
+                if (lineDate) curExp.dates = lineDate;
+                break;
+              }
+            }
+          }
+          // Split long concatenated bullets: "Did A. Did B. Did C." → separate bullets
+          const splitBullets = splitLongBullet(bullet);
+          curExp.bullets.push(...splitBullets);
         } else {
           // First line with no job pattern, treat as a new job entry
-          curExp = { title: line, company: '', dates: '', location: '', bullets: [] };
+          curExp = { title: line.replace(/^[•\-*]\s*/, ''), company: '', dates: '', location: '', bullets: [] };
         }
         break;
       }
